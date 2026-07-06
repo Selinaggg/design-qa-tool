@@ -29,7 +29,7 @@ export default function AnnotationStep({
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-slate-500">
-          在截图上拖拽框选关键区域。相同名称的 iOS / Android 区域会被关联为同一目标区域。
+          如果 iOS 和 Android 中的对应模块使用相同名称，例如都命名为「底部按钮」，报告会将它们配对比较。
         </p>
         {totalRegions > 0 && (
           <span className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-full border border-blue-100 flex-shrink-0">
@@ -73,7 +73,7 @@ export default function AnnotationStep({
       {totalRegions === 0 && (
         <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-center">
           <p className="text-xs text-slate-400">
-            此步骤可选 — 跳过后走查报告将使用默认 mock 问题；标注区域后报告问题将与区域关联。
+            此步骤可选 — 跳过后系统会进行默认走查；框选关注区域后，报告问题将与对应模块关联。
           </p>
         </div>
       )}

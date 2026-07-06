@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import AppHeader from '@/components/layout/AppHeader';
 import DropZone from '@/components/upload/DropZone';
 import AnnotationStep from '@/components/cross-platform/AnnotationStep';
@@ -81,6 +81,16 @@ export default function CrossPlatformPage() {
   const bothUploaded = iosImage !== null && androidImage !== null;
   const canAudit = bothUploaded && !isAuditing;
 
+  // ── Refs ──────────────────────────────────────────────────────────────────
+  const resultRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to results when audit completes (only when result transitions to non-null)
+  useEffect(() => {
+    if (result && resultRef.current) {
+      resultRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [result]);
+
   // ── Helpers ───────────────────────────────────────────────────────────────
   const removeImage = (setter: (v: null) => void, img: ImageFile | null) => {
     if (img?.url?.startsWith('blob:')) URL.revokeObjectURL(img.url);
@@ -127,12 +137,45 @@ export default function CrossPlatformPage() {
     }
   };
 
+  const handleReset = () => {
+    removeImage(setIosImage, iosImage);
+    removeImage(setAndroidImage, androidImage);
+    removeImage(setDesignImage, designImage);
+    setIosRegions([]);
+    setAndroidRegions([]);
+    setResult(null);
+    setIsAuditing(false);
+    setAuditError(null);
+    setHighlightedRegionName(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
       <AppHeader />
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-8 flex flex-col gap-8">
+
+        {/* Intro / Hero */}
+        <div className="flex flex-col gap-3 pb-2 border-b border-slate-200">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">跨端一致性走查</h1>
+            <p className="mt-1.5 text-sm text-slate-500 max-w-2xl">
+              上传设计稿、iOS 截图和 Android 截图，快速发现跨端布局、视觉和内容不一致问题。
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {['设计验收', 'QA 走查', '多端适配', '交付检查'].map((tag) => (
+              <span
+                key={tag}
+                className="text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        </div>
 
         {/* Step 1: Upload */}
         <Section step={1} title="上传截图" subtitle="iOS 和 Android 截图必填，设计稿可选（用于计算还原度）">
@@ -155,8 +198,8 @@ export default function CrossPlatformPage() {
         {bothUploaded && (
           <Section
             step={2}
-            title="标注目标区域"
-            subtitle="在截图上拖拽框选关键区域；此步骤可选，跳过后报告使用默认问题"
+            title="标注关注区域"
+            subtitle="可选：粗略框选你想重点检查的模块，例如导航栏、按钮、商品卡片。标注用于让报告更聚焦，不要求像素级精准。跳过后系统会进行默认走查。"
             optional
           >
             <AnnotationStep
@@ -239,7 +282,7 @@ export default function CrossPlatformPage() {
           {!bothUploaded && <p className="text-sm text-slate-400">请先上传 iOS 和 Android 截图</p>}
           {bothUploaded && (iosRegions.length + androidRegions.length) > 0 && (
             <p className="text-xs text-slate-500">
-              已标注 {mergeRegions(iosRegions, androidRegions).length} 个目标区域，报告将基于这些区域生成问题
+              已标注 {mergeRegions(iosRegions, androidRegions).length} 个关注区域，报告将基于这些区域生成问题
             </p>
           )}
         </div>
@@ -252,7 +295,20 @@ export default function CrossPlatformPage() {
 
         {/* Results */}
         {result && iosImage && androidImage && (
-          <>
+          <div ref={resultRef} className="flex flex-col gap-6">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-slate-500">走查完成</span>
+              <button
+                onClick={handleReset}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                清空重来
+              </button>
+            </div>
+
             {result.isMock && (
               <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
                 <svg className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -341,7 +397,7 @@ export default function CrossPlatformPage() {
                 </div>
               </div>
             </Section>
-          </>
+          </div>
         )}
       </main>
     </div>
