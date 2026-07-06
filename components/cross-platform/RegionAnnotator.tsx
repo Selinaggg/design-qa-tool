@@ -4,6 +4,8 @@ import { useState, useRef } from 'react';
 import type { ImageFile } from '@/types';
 import type { DrawingRegion, RegionType, NormalizedRect } from '@/lib/crossPlatform/types';
 
+// ── Region type config ────────────────────────────────────────────────────────
+
 export const REGION_CONFIG: Record<RegionType, { label: string; color: string }> = {
   layout:      { label: '布局',  color: '#3B82F6' },
   content:     { label: '内容',  color: '#8B5CF6' },
@@ -12,7 +14,74 @@ export const REGION_CONFIG: Record<RegionType, { label: string; color: string }>
   component:   { label: '组件',  color: '#14B8A6' },
 };
 
-const MIN_SIZE = 0.02; // minimum normalized rect dimension
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const MIN_SIZE   = 0.02; // minimum for newly drawn regions
+const MIN_WIDTH  = 0.03; // minimum width after resize
+const MIN_HEIGHT = 0.03; // minimum height after resize
+
+// ── Resize handle types & config ──────────────────────────────────────────────
+
+type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
+
+const HANDLE_DEFS: Array<{
+  id: ResizeHandle;
+  cursor: string;
+  style: React.CSSProperties;
+}> = [
+  { id: 'nw', cursor: 'nwse-resize', style: { top: 0,    left: 0,     transform: 'translate(-50%,-50%)' } },
+  { id: 'n',  cursor: 'ns-resize',   style: { top: 0,    left: '50%', transform: 'translate(-50%,-50%)' } },
+  { id: 'ne', cursor: 'nesw-resize', style: { top: 0,    right: 0,    transform: 'translate(50%,-50%)'  } },
+  { id: 'e',  cursor: 'ew-resize',   style: { top: '50%',right: 0,    transform: 'translate(50%,-50%)'  } },
+  { id: 'se', cursor: 'nwse-resize', style: { bottom: 0, right: 0,    transform: 'translate(50%,50%)'   } },
+  { id: 's',  cursor: 'ns-resize',   style: { bottom: 0, left: '50%', transform: 'translate(-50%,50%)'  } },
+  { id: 'sw', cursor: 'nesw-resize', style: { bottom: 0, left: 0,     transform: 'translate(-50%,50%)'  } },
+  { id: 'w',  cursor: 'ew-resize',   style: { top: '50%',left: 0,     transform: 'translate(-50%,-50%)' } },
+];
+
+// ── Resize math (pure, no side-effects) ───────────────────────────────────────
+//
+// Each handle moves one or two edges. The opposing edge stays fixed.
+// Strategy per edge direction:
+//   Left  edge moves → clamp new x in [0, right - MIN_WIDTH],  w = right - x
+//   Right edge moves → clamp new w in [MIN_WIDTH, 1 - orig.x]
+//   Top   edge moves → clamp new y in [0, bottom - MIN_HEIGHT], h = bottom - y
+//   Bottom edge moves → clamp new h in [MIN_HEIGHT, 1 - orig.y]
+
+function computeResizedRect(
+  handle: ResizeHandle,
+  orig: NormalizedRect,
+  dx: number,
+  dy: number,
+): NormalizedRect {
+  const right  = orig.x + orig.width;
+  const bottom = orig.y + orig.height;
+
+  let x = orig.x, y = orig.y, w = orig.width, h = orig.height;
+
+  // Left edge moves: nw, w, sw
+  if (handle === 'nw' || handle === 'w' || handle === 'sw') {
+    x = Math.max(0, Math.min(right - MIN_WIDTH, orig.x + dx));
+    w = right - x;
+  }
+  // Right edge moves: ne, e, se
+  if (handle === 'ne' || handle === 'e' || handle === 'se') {
+    w = Math.max(MIN_WIDTH, Math.min(1 - orig.x, orig.width + dx));
+  }
+  // Top edge moves: nw, n, ne
+  if (handle === 'nw' || handle === 'n' || handle === 'ne') {
+    y = Math.max(0, Math.min(bottom - MIN_HEIGHT, orig.y + dy));
+    h = bottom - y;
+  }
+  // Bottom edge moves: sw, s, se
+  if (handle === 'sw' || handle === 's' || handle === 'se') {
+    h = Math.max(MIN_HEIGHT, Math.min(1 - orig.y, orig.height + dy));
+  }
+
+  return { x, y, width: w, height: h };
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 interface RegionAnnotatorProps {
   image: ImageFile;
@@ -31,7 +100,7 @@ export default function RegionAnnotator({
 }: RegionAnnotatorProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
 
-  // ── Drawing state ────────────────────────────────────────────────────────
+  // ── Draw state ───────────────────────────────────────────────────────────
   const [isDrawing, setIsDrawing] = useState(false);
   const drawStart = useRef<{ x: number; y: number } | null>(null);
   const [ghostRect, setGhostRect] = useState<NormalizedRect | null>(null);
@@ -41,15 +110,24 @@ export default function RegionAnnotator({
   const [pendingName, setPendingName] = useState('');
   const [pendingType, setPendingType] = useState<RegionType>('layout');
 
-  // ── Drag-to-move state ───────────────────────────────────────────────────
+  // ── Move state ───────────────────────────────────────────────────────────
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [draggingRect, setDraggingRect] = useState<NormalizedRect | null>(null);
-  // Stores pointer and region origin at drag start to compute delta
   const dragStart = useRef<{ px: number; py: number; rx: number; ry: number } | null>(null);
 
+  // ── Resize state ─────────────────────────────────────────────────────────
+  const [resizingId, setResizingId] = useState<string | null>(null);
+  const [resizingRect, setResizingRect] = useState<NormalizedRect | null>(null);
+  const resizeStart = useRef<{
+    handle: ResizeHandle;
+    origRect: NormalizedRect;
+    px: number;
+    py: number;
+  } | null>(null);
+
   // ── Coordinate helper ────────────────────────────────────────────────────
-  // Works for both overlay events and child region div events because
-  // the overlay is absolute inset-0 — its bounding rect equals the image area.
+  // Works for both overlay and child region/handle events because the overlay
+  // is absolute inset-0 — its bounding rect equals the image area.
   const normPos = (e: React.PointerEvent): { x: number; y: number } => {
     const el = overlayRef.current;
     if (!el) return { x: 0, y: 0 };
@@ -63,11 +141,11 @@ export default function RegionAnnotator({
   const makeRect = (a: { x: number; y: number }, b: { x: number; y: number }): NormalizedRect => ({
     x: Math.min(a.x, b.x),
     y: Math.min(a.y, b.y),
-    width: Math.abs(b.x - a.x),
+    width:  Math.abs(b.x - a.x),
     height: Math.abs(b.y - a.y),
   });
 
-  // ── Overlay pointer handlers (draw new region on empty space) ────────────
+  // ── Overlay handlers: draw new region on empty space ─────────────────────
   const handlePointerDown = (e: React.PointerEvent) => {
     if (pendingRect) return;
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -95,10 +173,9 @@ export default function RegionAnnotator({
     }
   };
 
-  // ── Region drag-to-move handlers ─────────────────────────────────────────
+  // ── Region body handlers: drag to move ───────────────────────────────────
   const handleRegionPointerDown = (e: React.PointerEvent, region: DrawingRegion) => {
-    // Stop event reaching the overlay so it doesn't start a new draw
-    e.stopPropagation();
+    e.stopPropagation(); // prevent overlay draw
     if (pendingRect) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     const pos = normPos(e);
@@ -112,21 +189,52 @@ export default function RegionAnnotator({
     const pos = normPos(e);
     const dx = pos.x - dragStart.current.px;
     const dy = pos.y - dragStart.current.py;
-    // Clamp so the region can't be dragged outside [0,1] bounds
-    const newX = Math.max(0, Math.min(1 - region.rect.width, dragStart.current.rx + dx));
+    const newX = Math.max(0, Math.min(1 - region.rect.width,  dragStart.current.rx + dx));
     const newY = Math.max(0, Math.min(1 - region.rect.height, dragStart.current.ry + dy));
     setDraggingRect({ ...region.rect, x: newX, y: newY });
   };
 
   const handleRegionPointerUp = (region: DrawingRegion) => {
     if (draggingId === region.id && draggingRect) {
-      onRegionsChange(
-        regions.map((r) => (r.id === region.id ? { ...r, rect: draggingRect } : r)),
-      );
+      onRegionsChange(regions.map((r) => (r.id === region.id ? { ...r, rect: draggingRect } : r)));
     }
     setDraggingId(null);
     setDraggingRect(null);
     dragStart.current = null;
+  };
+
+  // ── Resize handle handlers ────────────────────────────────────────────────
+  const handleResizePointerDown = (
+    e: React.PointerEvent,
+    region: DrawingRegion,
+    handle: ResizeHandle,
+  ) => {
+    e.stopPropagation(); // prevent region body move and overlay draw
+    if (pendingRect) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const pos = normPos(e);
+    setResizingId(region.id);
+    setResizingRect(region.rect);
+    resizeStart.current = { handle, origRect: region.rect, px: pos.x, py: pos.y };
+  };
+
+  const handleResizePointerMove = (e: React.PointerEvent, region: DrawingRegion) => {
+    e.stopPropagation();
+    if (resizingId !== region.id || !resizeStart.current) return;
+    const pos = normPos(e);
+    const dx = pos.x - resizeStart.current.px;
+    const dy = pos.y - resizeStart.current.py;
+    setResizingRect(computeResizedRect(resizeStart.current.handle, resizeStart.current.origRect, dx, dy));
+  };
+
+  const handleResizePointerUp = (e: React.PointerEvent, region: DrawingRegion) => {
+    e.stopPropagation();
+    if (resizingId === region.id && resizingRect) {
+      onRegionsChange(regions.map((r) => (r.id === region.id ? { ...r, rect: resizingRect } : r)));
+    }
+    setResizingId(null);
+    setResizingRect(null);
+    resizeStart.current = null;
   };
 
   // ── Region management ────────────────────────────────────────────────────
@@ -144,7 +252,7 @@ export default function RegionAnnotator({
   const deleteRegion = (id: string) =>
     onRegionsChange(regions.filter((r) => r.id !== id));
 
-  // ── Render ───────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col gap-3">
       {/* Image + annotation overlay */}
@@ -160,44 +268,51 @@ export default function RegionAnnotator({
           style={{ display: 'block', width: '100%', height: 'auto' }}
         />
 
-        {/* Pointer-capture overlay — only fires when clicking empty space */}
+        {/* Pointer-capture overlay — fires only for clicks on empty space */}
         <div
           ref={overlayRef}
-          className={`absolute inset-0 ${pendingRect || draggingId ? 'cursor-default' : 'cursor-crosshair'}`}
+          className={`absolute inset-0 ${
+            pendingRect || draggingId || resizingId ? 'cursor-default' : 'cursor-crosshair'
+          }`}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
         >
-          {/* Existing regions — draggable */}
+          {/* Existing regions */}
           {regions.map((region) => {
-            const cfg = REGION_CONFIG[region.type];
+            const cfg        = REGION_CONFIG[region.type];
             const isHighlighted = region.name === highlightedRegionName;
-            const isDragging = region.id === draggingId;
-            // During drag show local draggingRect; otherwise show persisted rect
-            const rect = isDragging && draggingRect ? draggingRect : region.rect;
+            const isDragging    = region.id === draggingId;
+            const isResizing    = region.id === resizingId;
+            const isActive      = isDragging || isResizing;
+
+            // Show live local rect during drag/resize; fall back to persisted rect
+            const rect =
+              isDragging && draggingRect ? draggingRect :
+              isResizing && resizingRect ? resizingRect :
+              region.rect;
 
             return (
               <div
                 key={region.id}
                 style={{
                   position: 'absolute',
-                  left: `${rect.x * 100}%`,
-                  top: `${rect.y * 100}%`,
-                  width: `${rect.width * 100}%`,
+                  left:   `${rect.x * 100}%`,
+                  top:    `${rect.y * 100}%`,
+                  width:  `${rect.width  * 100}%`,
                   height: `${rect.height * 100}%`,
                   border: `2px solid ${cfg.color}`,
-                  backgroundColor: isDragging
+                  backgroundColor: isActive
                     ? `${cfg.color}30`
                     : isHighlighted
                     ? `${cfg.color}38`
                     : `${cfg.color}18`,
-                  boxShadow: isDragging
+                  boxShadow: isActive
                     ? `0 0 0 2px ${cfg.color}88`
                     : isHighlighted
                     ? `0 0 0 3px ${cfg.color}44`
                     : 'none',
-                  // Disable transition during drag for snappy feel
-                  transition: isDragging ? 'none' : 'all 0.2s',
+                  transition: isActive ? 'none' : 'all 0.2s',
                   pointerEvents: 'auto',
                   cursor: 'move',
                   userSelect: 'none',
@@ -207,7 +322,7 @@ export default function RegionAnnotator({
                 onPointerUp={() => handleRegionPointerUp(region)}
                 onPointerCancel={() => handleRegionPointerUp(region)}
               >
-                {/* Label — pointerEvents:none so it doesn't interrupt drag */}
+                {/* Region label */}
                 <span
                   style={{
                     position: 'absolute',
@@ -224,10 +339,33 @@ export default function RegionAnnotator({
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     pointerEvents: 'none',
+                    zIndex: 1,
                   }}
                 >
                   {region.name}
                 </span>
+
+                {/* 8 resize handles */}
+                {HANDLE_DEFS.map((hcfg) => (
+                  <div
+                    key={hcfg.id}
+                    style={{
+                      position: 'absolute',
+                      width: 10,
+                      height: 10,
+                      background: 'white',
+                      border: `1.5px solid ${cfg.color}`,
+                      borderRadius: 2,
+                      cursor: hcfg.cursor,
+                      zIndex: 2,
+                      ...hcfg.style,
+                    }}
+                    onPointerDown={(e) => handleResizePointerDown(e, region, hcfg.id)}
+                    onPointerMove={(e) => handleResizePointerMove(e, region)}
+                    onPointerUp={(e) => handleResizePointerUp(e, region)}
+                    onPointerCancel={(e) => handleResizePointerUp(e, region)}
+                  />
+                ))}
               </div>
             );
           })}
@@ -237,9 +375,9 @@ export default function RegionAnnotator({
             <div
               style={{
                 position: 'absolute',
-                left: `${pendingRect.x * 100}%`,
-                top: `${pendingRect.y * 100}%`,
-                width: `${pendingRect.width * 100}%`,
+                left:   `${pendingRect.x * 100}%`,
+                top:    `${pendingRect.y * 100}%`,
+                width:  `${pendingRect.width  * 100}%`,
                 height: `${pendingRect.height * 100}%`,
                 border: '2px dashed #64748B',
                 backgroundColor: '#64748B18',
@@ -253,9 +391,9 @@ export default function RegionAnnotator({
             <div
               style={{
                 position: 'absolute',
-                left: `${ghostRect.x * 100}%`,
-                top: `${ghostRect.y * 100}%`,
-                width: `${ghostRect.width * 100}%`,
+                left:   `${ghostRect.x * 100}%`,
+                top:    `${ghostRect.y * 100}%`,
+                width:  `${ghostRect.width  * 100}%`,
                 height: `${ghostRect.height * 100}%`,
                 border: '1.5px dashed #94A3B8',
                 backgroundColor: '#94A3B810',
