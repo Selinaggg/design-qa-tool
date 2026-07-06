@@ -31,7 +31,7 @@ export default function RegionAnnotator({
 }: RegionAnnotatorProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
 
-  // Drawing state
+  // ── Drawing state ────────────────────────────────────────────────────────
   const [isDrawing, setIsDrawing] = useState(false);
   const drawStart = useRef<{ x: number; y: number } | null>(null);
   const [ghostRect, setGhostRect] = useState<NormalizedRect | null>(null);
@@ -41,7 +41,15 @@ export default function RegionAnnotator({
   const [pendingName, setPendingName] = useState('');
   const [pendingType, setPendingType] = useState<RegionType>('layout');
 
-  // ── Coordinate helper ───────────────────────────────────────────────────
+  // ── Drag-to-move state ───────────────────────────────────────────────────
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [draggingRect, setDraggingRect] = useState<NormalizedRect | null>(null);
+  // Stores pointer and region origin at drag start to compute delta
+  const dragStart = useRef<{ px: number; py: number; rx: number; ry: number } | null>(null);
+
+  // ── Coordinate helper ────────────────────────────────────────────────────
+  // Works for both overlay events and child region div events because
+  // the overlay is absolute inset-0 — its bounding rect equals the image area.
   const normPos = (e: React.PointerEvent): { x: number; y: number } => {
     const el = overlayRef.current;
     if (!el) return { x: 0, y: 0 };
@@ -59,9 +67,9 @@ export default function RegionAnnotator({
     height: Math.abs(b.y - a.y),
   });
 
-  // ── Pointer handlers ────────────────────────────────────────────────────
+  // ── Overlay pointer handlers (draw new region on empty space) ────────────
   const handlePointerDown = (e: React.PointerEvent) => {
-    if (pendingRect) return; // form is open, don't start a new draw
+    if (pendingRect) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     const pos = normPos(e);
     drawStart.current = pos;
@@ -80,7 +88,6 @@ export default function RegionAnnotator({
     const rect = makeRect(drawStart.current, normPos(e));
     drawStart.current = null;
     setGhostRect(null);
-
     if (rect.width >= MIN_SIZE && rect.height >= MIN_SIZE) {
       setPendingRect(rect);
       setPendingName('');
@@ -88,7 +95,41 @@ export default function RegionAnnotator({
     }
   };
 
-  // ── Region management ───────────────────────────────────────────────────
+  // ── Region drag-to-move handlers ─────────────────────────────────────────
+  const handleRegionPointerDown = (e: React.PointerEvent, region: DrawingRegion) => {
+    // Stop event reaching the overlay so it doesn't start a new draw
+    e.stopPropagation();
+    if (pendingRect) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const pos = normPos(e);
+    setDraggingId(region.id);
+    setDraggingRect(region.rect);
+    dragStart.current = { px: pos.x, py: pos.y, rx: region.rect.x, ry: region.rect.y };
+  };
+
+  const handleRegionPointerMove = (e: React.PointerEvent, region: DrawingRegion) => {
+    if (draggingId !== region.id || !dragStart.current) return;
+    const pos = normPos(e);
+    const dx = pos.x - dragStart.current.px;
+    const dy = pos.y - dragStart.current.py;
+    // Clamp so the region can't be dragged outside [0,1] bounds
+    const newX = Math.max(0, Math.min(1 - region.rect.width, dragStart.current.rx + dx));
+    const newY = Math.max(0, Math.min(1 - region.rect.height, dragStart.current.ry + dy));
+    setDraggingRect({ ...region.rect, x: newX, y: newY });
+  };
+
+  const handleRegionPointerUp = (region: DrawingRegion) => {
+    if (draggingId === region.id && draggingRect) {
+      onRegionsChange(
+        regions.map((r) => (r.id === region.id ? { ...r, rect: draggingRect } : r)),
+      );
+    }
+    setDraggingId(null);
+    setDraggingRect(null);
+    dragStart.current = null;
+  };
+
+  // ── Region management ────────────────────────────────────────────────────
   const confirmRegion = () => {
     if (!pendingRect || !pendingName.trim()) return;
     onRegionsChange([
@@ -119,34 +160,54 @@ export default function RegionAnnotator({
           style={{ display: 'block', width: '100%', height: 'auto' }}
         />
 
-        {/* Pointer-capture overlay */}
+        {/* Pointer-capture overlay — only fires when clicking empty space */}
         <div
           ref={overlayRef}
-          className={`absolute inset-0 ${pendingRect ? 'cursor-default' : 'cursor-crosshair'}`}
+          className={`absolute inset-0 ${pendingRect || draggingId ? 'cursor-default' : 'cursor-crosshair'}`}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
         >
-          {/* Existing regions */}
+          {/* Existing regions — draggable */}
           {regions.map((region) => {
             const cfg = REGION_CONFIG[region.type];
             const isHighlighted = region.name === highlightedRegionName;
+            const isDragging = region.id === draggingId;
+            // During drag show local draggingRect; otherwise show persisted rect
+            const rect = isDragging && draggingRect ? draggingRect : region.rect;
+
             return (
               <div
                 key={region.id}
                 style={{
                   position: 'absolute',
-                  left: `${region.rect.x * 100}%`,
-                  top: `${region.rect.y * 100}%`,
-                  width: `${region.rect.width * 100}%`,
-                  height: `${region.rect.height * 100}%`,
+                  left: `${rect.x * 100}%`,
+                  top: `${rect.y * 100}%`,
+                  width: `${rect.width * 100}%`,
+                  height: `${rect.height * 100}%`,
                   border: `2px solid ${cfg.color}`,
-                  backgroundColor: isHighlighted ? `${cfg.color}38` : `${cfg.color}18`,
-                  boxShadow: isHighlighted ? `0 0 0 3px ${cfg.color}44` : 'none',
-                  transition: 'all 0.2s',
-                  pointerEvents: 'none',
+                  backgroundColor: isDragging
+                    ? `${cfg.color}30`
+                    : isHighlighted
+                    ? `${cfg.color}38`
+                    : `${cfg.color}18`,
+                  boxShadow: isDragging
+                    ? `0 0 0 2px ${cfg.color}88`
+                    : isHighlighted
+                    ? `0 0 0 3px ${cfg.color}44`
+                    : 'none',
+                  // Disable transition during drag for snappy feel
+                  transition: isDragging ? 'none' : 'all 0.2s',
+                  pointerEvents: 'auto',
+                  cursor: 'move',
+                  userSelect: 'none',
                 }}
+                onPointerDown={(e) => handleRegionPointerDown(e, region)}
+                onPointerMove={(e) => handleRegionPointerMove(e, region)}
+                onPointerUp={() => handleRegionPointerUp(region)}
+                onPointerCancel={() => handleRegionPointerUp(region)}
               >
+                {/* Label — pointerEvents:none so it doesn't interrupt drag */}
                 <span
                   style={{
                     position: 'absolute',
@@ -162,6 +223,7 @@ export default function RegionAnnotator({
                     maxWidth: '100%',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
+                    pointerEvents: 'none',
                   }}
                 >
                   {region.name}
@@ -170,7 +232,7 @@ export default function RegionAnnotator({
             );
           })}
 
-          {/* Pending rect (awaiting name) */}
+          {/* Pending rect (awaiting name input) */}
           {pendingRect && (
             <div
               style={{
@@ -204,7 +266,7 @@ export default function RegionAnnotator({
         </div>
       </div>
 
-      {/* Name form (appears after drawing) */}
+      {/* Name form (appears after drawing a new region) */}
       {pendingRect && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex flex-col gap-3">
           <p className="text-xs font-semibold text-blue-700">为框选区域命名</p>
