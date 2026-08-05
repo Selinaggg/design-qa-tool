@@ -71,6 +71,8 @@ export interface AuditScenario {
 
 export type IssueType = 'content' | 'layout' | 'style' | 'interaction' | 'platform-specific';
 export type IssueSeverityCP = 'critical' | 'high' | 'medium' | 'low';
+/** 问题处理状态；跨版本走查时用于流转 */
+export type IssueStatusCP = 'pending' | 'deferred' | 'ignored' | 'fixed';
 
 export interface PlatformConsistencyIssue {
   id: string;
@@ -78,6 +80,10 @@ export interface PlatformConsistencyIssue {
   description: string;
   type: IssueType;
   severity: IssueSeverityCP;
+  /** 处理状态；未设置时视作 'pending' */
+  status?: IssueStatusCP;
+  /** 分类标签（如「间距」「对齐」） */
+  tags?: string[];
   platforms: PlatformType[];
   regionName?: string;
   iosLocation?: NormalizedRect;
@@ -87,6 +93,8 @@ export interface PlatformConsistencyIssue {
   suggestion: string;
   /** 0–1, AI confidence score */
   confidence: number;
+  /** true = 用户手工标注；false / undefined = AI 检测 */
+  manual?: boolean;
 }
 
 // ── Request / Response ────────────────────────────────────────────────────
@@ -99,11 +107,16 @@ export interface AuditOptions {
 
 export interface CrossPlatformAuditRequest {
   scenario: AuditScenario;
-  iosImageUrl: string;
-  androidImageUrl: string;
+  /** iOS 端截图 URL；单端走查时可缺失 */
+  iosImageUrl?: string;
+  /** Android 端截图 URL；单端走查时可缺失 */
+  androidImageUrl?: string;
+  /** 设计稿 URL；双端时可选，单端时必需（作为对比基线） */
   designImageUrl?: string;
-  iosDevice: DeviceProfile;
-  androidDevice: DeviceProfile;
+  /** iOS 设备配置；iOS 截图存在时应传 */
+  iosDevice?: DeviceProfile;
+  /** Android 设备配置；Android 截图存在时应传 */
+  androidDevice?: DeviceProfile;
   options: AuditOptions;
 }
 

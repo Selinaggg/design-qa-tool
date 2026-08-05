@@ -6,9 +6,11 @@ import type { ImageFile } from '@/types';
 interface SliderViewProps {
   designImage: ImageFile;
   liveImage: ImageFile;
+  leftLabel?: string;
+  rightLabel?: string;
 }
 
-export default function SliderView({ designImage, liveImage }: SliderViewProps) {
+export default function SliderView({ designImage, liveImage, leftLabel = '← 设计稿', rightLabel = '线上页面 →' }: SliderViewProps) {
   const [sliderPos, setSliderPos] = useState(50); // percentage
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
@@ -51,8 +53,8 @@ export default function SliderView({ designImage, liveImage }: SliderViewProps) 
     <div className="flex flex-col gap-3 select-none">
       {/* Labels */}
       <div className="flex justify-between text-xs font-semibold uppercase tracking-wide text-slate-500 px-1">
-        <span>← 设计稿</span>
-        <span>线上页面 →</span>
+        <span>{leftLabel}</span>
+        <span>{rightLabel}</span>
       </div>
 
       {/* Slider container — CSS Grid overlay trick */}

@@ -9,6 +9,21 @@ export type ComparisonMode = 'side-by-side' | 'slider' | 'diff';
 
 export type IssueSeverity = 'Critical' | 'Major' | 'Minor';
 
+/** 问题处理状态（人工判定 + 状态流转） */
+export type IssueStatus = 'pending' | 'deferred' | 'ignored' | 'fixed';
+
+/**
+ * 归一化坐标（0-1，相对于图片尺寸），支持点或框两种形态：
+ *  - 只有 x/y → 点位（贴一个圆形编号徽章）
+ *  - 有 width/height → 矩形框（描边 + 左上角贴编号徽章）
+ */
+export interface IssueLocation {
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+}
+
 export interface Issue {
   id: string;
   severity: IssueSeverity;
@@ -16,6 +31,14 @@ export interface Issue {
   description: string;
   impact: string;
   suggestion: string;
+  /** 问题在设计稿上的位置（可选） */
+  designLocation?: IssueLocation;
+  /** 问题在线上/研发稿上的位置（可选） */
+  liveLocation?: IssueLocation;
+  /** 处理状态，默认 pending */
+  status?: IssueStatus;
+  /** 子类型标签，例如 "字号" "圆角" "颜色" "间距"，用于右栏展示 */
+  tags?: string[];
 }
 
 export interface AnalysisResult {

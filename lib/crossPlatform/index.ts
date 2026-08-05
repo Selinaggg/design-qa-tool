@@ -34,5 +34,6 @@ export type {
   AuditOptions,
   IssueType,
   IssueSeverityCP,
+  IssueStatusCP,
   PlatformType,
 } from './types';

@@ -4,8 +4,10 @@ import { useState } from 'react';
 import SideBySideView from './SideBySideView';
 import SliderView from './SliderView';
 import DiffHighlightView from './DiffHighlightView';
+import type { BadgeItem } from './IssueBadgeOverlay';
 import type { ComparisonMode, ImageFile } from '@/types';
 import type { DiffResult } from '@/lib/diffEngine';
+import type { ImageSource } from '@/components/workbench/types';
 
 interface Tab {
   id: ComparisonMode;
@@ -23,10 +25,16 @@ interface ComparisonViewerProps {
   designImage: ImageFile;
   liveImage: ImageFile;
   sizeMatch: boolean;
-  // diff state lifted to page so AI panel can also consume it
   diffResult: DiffResult | null;
   isDiffProcessing: boolean;
   diffError: string | null;
+  // ── 新增：徽章 & 来源 ──────────────────────────────────
+  designBadges?: BadgeItem[];
+  liveBadges?: BadgeItem[];
+  highlightedId?: string | null;
+  onBadgeSelect?: (id: string) => void;
+  designSource?: ImageSource;
+  liveSource?: ImageSource;
 }
 
 export default function ComparisonViewer({
@@ -36,6 +44,12 @@ export default function ComparisonViewer({
   diffResult,
   isDiffProcessing,
   diffError,
+  designBadges,
+  liveBadges,
+  highlightedId,
+  onBadgeSelect,
+  designSource,
+  liveSource,
 }: ComparisonViewerProps) {
   const [mode, setMode] = useState<ComparisonMode>('side-by-side');
 
@@ -92,7 +106,16 @@ export default function ComparisonViewer({
       {/* View area */}
       <div>
         {mode === 'side-by-side' && (
-          <SideBySideView designImage={designImage} liveImage={liveImage} />
+          <SideBySideView
+            designImage={designImage}
+            liveImage={liveImage}
+            designBadges={designBadges}
+            liveBadges={liveBadges}
+            highlightedId={highlightedId}
+            onBadgeSelect={onBadgeSelect}
+            designSource={designSource}
+            liveSource={liveSource}
+          />
         )}
         {mode === 'slider' && (
           <SliderView designImage={designImage} liveImage={liveImage} />

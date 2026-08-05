@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const NAV = [
-  { href: '/', label: '设计走查' },
-  { href: '/cross-platform', label: '跨端走查' },
+  { href: '/', label: '工作台' },
+  { href: '/legacy/cross-platform', label: '跨端走查（旧版）' },
 ];
 
 export default function AppHeader() {
