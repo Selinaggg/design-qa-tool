@@ -6,12 +6,13 @@ import PlatformComparison from '@/components/cross-platform/PlatformComparison';
 import AnnotationStep from '@/components/cross-platform/AnnotationStep';
 import SliderView from '@/components/comparison/SliderView';
 import CanvasBoard, { type CanvasBoardHandle } from './CanvasBoard';
+import BoardTabs from './BoardTabs';
 import InsightsBar, { ExportDropdown } from './InsightsBar';
 import VersionDiffDialog from './VersionDiffDialog';
 import { toneFromSeverity, type BadgeItem } from '@/components/comparison/IssueBadgeOverlay';
 import type { AuditSession, AuditVersion } from './types';
 import { MAX_VERSIONS } from './types';
-import { getCurrentVersion, canAddVersion } from '@/lib/sessionHelpers';
+import { getCurrentVersion, canAddVersion, getActiveContext } from '@/lib/sessionHelpers';
 import type {
   CrossPlatformAuditResult,
   DrawingRegion,
@@ -58,6 +59,8 @@ interface WorkbenchMainProps {
   onNewAudit: () => void;
   onAddVersion: () => void;
   onSwitchVersion: (index: number) => void;
+  /** 批量走查：切换 activeBoard（P2.7） */
+  onSetActiveBoard?: (boardId: string) => void;
   onUpdateSession: (patch: Partial<AuditSession>) => void;
   onUpdateVersion: (patch: Partial<AuditVersion>) => void;
   highlightedRegionName?: string | null;
@@ -85,6 +88,7 @@ export default function WorkbenchMain({
   onNewAudit,
   onAddVersion,
   onSwitchVersion,
+  onSetActiveBoard,
   onUpdateSession,
   onUpdateVersion,
   highlightedRegionName,
@@ -120,10 +124,11 @@ export default function WorkbenchMain({
 
   const handleAudit = useCallback(async () => {
     if (!session) return;
-    const cur = getCurrentVersion(session);
-    const hasIos = !!cur.iosImage;
-    const hasAndroid = !!cur.androidImage;
-    const hasDesign = !!cur.designRefImage;
+    const ctx = getActiveContext(session);
+    if (!ctx) return;
+    const hasIos = !!ctx.iosImage;
+    const hasAndroid = !!ctx.androidImage;
+    const hasDesign = !!ctx.designImage || !!ctx.designFigma;
     // 至少一端
     if (!hasIos && !hasAndroid) return;
     // 单端必须搭配设计稿；单端无设计稿 → 跨端走查无法进行
@@ -135,8 +140,8 @@ export default function WorkbenchMain({
     if (hasIos && !session.iosDevice) return;
     if (hasAndroid && !session.androidDevice) return;
 
-    const iosRegions = cur.iosRegions ?? [];
-    const androidRegions = cur.androidRegions ?? [];
+    const iosRegions = ctx.iosRegions;
+    const androidRegions = ctx.androidRegions;
     const targetRegions = mergeRegions(iosRegions, androidRegions);
     setAuditing(true);
     try {
@@ -149,9 +154,9 @@ export default function WorkbenchMain({
             name: session.name,
             targetRegions: targetRegions.length > 0 ? targetRegions : undefined,
           },
-          iosImageUrl: cur.iosImage?.url,
-          androidImageUrl: cur.androidImage?.url,
-          designImageUrl: cur.designRefImage?.url ?? undefined,
+          iosImageUrl: ctx.iosImage?.url,
+          androidImageUrl: ctx.androidImage?.url,
+          designImageUrl: ctx.designImage?.url ?? ctx.designFigma?.imageUrl,
           iosDevice: session.iosDevice,
           androidDevice: session.androidDevice,
           options: session.options,
@@ -171,10 +176,10 @@ export default function WorkbenchMain({
     return <EmptyWorkbench onNewAudit={onNewAudit} />;
   }
 
-  const cur = getCurrentVersion(session);
-  const hasIos = !!cur.iosImage;
-  const hasAndroid = !!cur.androidImage;
-  const hasDesign = !!cur.designRefImage;
+  const ctx = getActiveContext(session);
+  const hasIos = !!ctx?.iosImage;
+  const hasAndroid = !!ctx?.androidImage;
+  const hasDesign = !!ctx?.designImage || !!ctx?.designFigma;
   // canRun：至少一端 + 相应设备 + (双端 或 单端有设计稿)
   const canRun =
     (hasIos && hasAndroid && !!session.iosDevice && !!session.androidDevice) ||
@@ -197,6 +202,11 @@ export default function WorkbenchMain({
           </span>
         </div>
       </div>
+
+      {/* BoardTabs：批量走查画板切换（P2.7）—— 仅 batch 会话且 boards>0 时渲染 */}
+      {session && session.type === 'batch' && onSetActiveBoard && (
+        <BoardTabs session={session} onSetActiveBoard={onSetActiveBoard} />
+      )}
 
       {/* ToolBar：工具条（替换 InsightsBar） */}
       {session && (
@@ -285,11 +295,12 @@ function CrossPlatformWorkbench({
   diffDialogOpen: boolean;
   onDiffDialogClose: () => void;
 }) {
-  const cur = getCurrentVersion(session);
-  const iosImage = cur.iosImage ?? null;
-  const androidImage = cur.androidImage ?? null;
-  const iosRegions = cur.iosRegions ?? [];
-  const androidRegions = cur.androidRegions ?? [];
+  const ctx = getActiveContext(session);
+  const iosImage = ctx?.iosImage ?? null;
+  const androidImage = ctx?.androidImage ?? null;
+  const iosRegions = ctx?.iosRegions ?? [];
+  const androidRegions = ctx?.androidRegions ?? [];
+  const crossPlatformResult = ctx?.crossPlatformResult ?? null;
 
   // ── CanvasBoard 命令式 API ref ──
   const canvasBoardRef = useRef<CanvasBoardHandle>(null);
@@ -297,7 +308,7 @@ function CrossPlatformWorkbench({
   // ── 高亮联动：highlightedIssueId 变化时聚焦到画板对应区域 ──
   useEffect(() => {
     if (!highlightedIssueId || !canvasBoardRef.current) return;
-    const r = cur.crossPlatformResult;
+    const r = crossPlatformResult;
     if (!r) return;
     const issue = r.issues.find((i) => i.id === highlightedIssueId);
     if (!issue) return;
@@ -312,7 +323,7 @@ function CrossPlatformWorkbench({
     if (!paneEl) return;
 
     canvasBoardRef.current.focusOnRect(paneEl, rect);
-  }, [highlightedIssueId, cur.crossPlatformResult]);
+  }, [highlightedIssueId, crossPlatformResult]);
 
   // 派生：手工标注激活时强制 compare（其他模式无法承载手工画框）
   const effectiveViewMode: ViewMode = manualMode !== 'idle' ? 'compare' : viewMode;
@@ -322,7 +333,7 @@ function CrossPlatformWorkbench({
   // ── 方案 4：从 highlightedIssueId 派生发光描边 rect ──
   const { iosHighlightRect, androidHighlightRect } = useMemo(() => {
     if (!highlightedIssueId) return { iosHighlightRect: null, androidHighlightRect: null };
-    const r = cur.crossPlatformResult;
+    const r = crossPlatformResult;
     if (!r) return { iosHighlightRect: null, androidHighlightRect: null };
     const issue = r.issues.find((i) => i.id === highlightedIssueId);
     if (!issue) return { iosHighlightRect: null, androidHighlightRect: null };
@@ -330,12 +341,12 @@ function CrossPlatformWorkbench({
       iosHighlightRect: issue.iosLocation ?? null,
       androidHighlightRect: issue.androidLocation ?? null,
     };
-  }, [highlightedIssueId, cur.crossPlatformResult]);
+  }, [highlightedIssueId, crossPlatformResult]);
 
-  const hasDesignRef = !!cur.designRefImage;
+  const hasDesignRef = !!ctx?.designImage || !!ctx?.designFigma;
 
   const { iosBadges, androidBadges } = useMemo(() => {
-    const r = cur.crossPlatformResult;
+    const r = crossPlatformResult;
     if (!r) return { iosBadges: [], androidBadges: [] };
     const ios: BadgeItem[] = [];
     const android: BadgeItem[] = [];
@@ -374,7 +385,7 @@ function CrossPlatformWorkbench({
       }
     });
     return { iosBadges: ios, androidBadges: android };
-  }, [cur.crossPlatformResult]);
+  }, [crossPlatformResult]);
 
   if (!iosImage && !androidImage) {
     return <MissingAssets text="尚未上传任何截图，请重新创建走查" />;
@@ -399,7 +410,7 @@ function CrossPlatformWorkbench({
             <PlatformComparison
               iosImage={iosImage}
               androidImage={androidImage}
-              designImage={cur.designRefImage}
+              designImage={ctx?.designImage ?? null}
               iosDeviceName={session.iosDevice?.name ?? 'iOS'}
               androidDeviceName={session.androidDevice?.name ?? 'Android'}
               iosRegions={iosRegions}
@@ -435,7 +446,7 @@ function CrossPlatformWorkbench({
                     ? 'android'
                     : sliderTarget;
                 const liveImage = actualTarget === 'ios' ? iosImage : androidImage;
-                if (!hasDesignRef || !cur.designRefImage) {
+                if (!hasDesignRef || !ctx?.designImage) {
                   return <MissingAssets text="未上传设计稿，无法进入叠加对比" />;
                 }
                 if (!liveImage) {
@@ -443,7 +454,7 @@ function CrossPlatformWorkbench({
                 }
                 return (
                   <SliderView
-                    designImage={cur.designRefImage}
+                    designImage={ctx.designImage}
                     liveImage={liveImage}
                     leftLabel="← 设计稿"
                     rightLabel={
@@ -462,7 +473,7 @@ function CrossPlatformWorkbench({
             <PlatformComparison
               iosImage={iosImage}
               androidImage={androidImage}
-              designImage={cur.designRefImage}
+              designImage={ctx?.designImage ?? null}
               iosDeviceName={session.iosDevice?.name ?? 'iOS'}
               androidDeviceName={session.androidDevice?.name ?? 'Android'}
               iosRegions={iosRegions}
@@ -607,11 +618,11 @@ function WorkbenchToolBar({
   manualMode: 'idle' | 'drawing' | 'editing';
   onStartManual: () => void;
 }) {
-  const cur = getCurrentVersion(session);
-  const hasDesignRef = !!cur.designRefImage;
-  const hasResult = !!cur.crossPlatformResult;
-  const onlyIos = !!cur.iosImage && !cur.androidImage;
-  const onlyAndroid = !cur.iosImage && !!cur.androidImage;
+  const ctx = getActiveContext(session);
+  const hasDesignRef = !!ctx?.designImage || !!ctx?.designFigma;
+  const hasResult = !!ctx?.crossPlatformResult;
+  const onlyIos = !!ctx?.iosImage && !ctx?.androidImage;
+  const onlyAndroid = !ctx?.iosImage && !!ctx?.androidImage;
   const isSinglePlatform = onlyIos || onlyAndroid;
   const isManualActive = manualMode !== 'idle';
 

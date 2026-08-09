@@ -10,6 +10,7 @@
 import type {
   AuditSession,
   AuditVersion,
+  Board,
 } from '@/components/workbench/types';
 import { MAX_VERSIONS } from '@/components/workbench/types';
 import type { ImageFile } from '@/types';
@@ -403,3 +404,139 @@ export function autoLinkIssuesBySimilarity(
     matched,
   };
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 批量走查（P1）：Board 读取 helper
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** 是否为批量走查（多画板） */
+export function isBatchSession(session: AuditSession | null | undefined): boolean {
+  return session?.type === 'batch';
+}
+
+/**
+ * 取当前版本下当前激活的 board
+ * 若是单画板走查（未设置 boards）或 boards 为空，返回 null
+ */
+export function getActiveBoard(session: AuditSession | null | undefined): Board | null {
+  if (!session) return null;
+  const version = getCurrentVersion(session);
+  if (!version.boards || version.boards.length === 0) return null;
+  const activeId = version.activeBoardId ?? version.boards[0].id;
+  return version.boards.find((b) => b.id === activeId) ?? version.boards[0] ?? null;
+}
+
+/** 按 id 从当前版本中取 board */
+export function getBoardById(
+  session: AuditSession | null | undefined,
+  boardId: string,
+): Board | null {
+  if (!session) return null;
+  const version = getCurrentVersion(session);
+  return version.boards?.find((b) => b.id === boardId) ?? null;
+}
+
+/**
+ * 统一读取接口 —— 屏蔽"单画板 vs 批量"的差异，供渲染层使用
+ * 单画板走查：从 version 顶层字段读
+ * 批量走查：从 activeBoard 读
+ *
+ * 未来所有 `getCurrentVersion(s).iosImage` 类调用可以迁移到这里；
+ * P1 仅提供该接口，不强制替换现有代码
+ */
+export interface ActiveContext {
+  iosImage: ImageFile | null;
+  androidImage: ImageFile | null;
+  /** 手动上传的设计稿图片；Figma 拉取的设计稿见 designFigma */
+  designImage: ImageFile | null;
+  /** batch 会话中该画板关联的 Figma frame（若有） */
+  designFigma: import('@/components/workbench/types').FigmaFrameRef | null;
+  crossPlatformResult: ReturnType<typeof getCurrentVersion>['crossPlatformResult'];
+  /** iOS 标注区域（batch 场景暂返回空数组，P4 引入 board.regions 时再补） */
+  iosRegions: import('@/lib/crossPlatform').DrawingRegion[];
+  androidRegions: import('@/lib/crossPlatform').DrawingRegion[];
+  /** 若是 batch 会话返回 activeBoard，否则 null */
+  activeBoard: Board | null;
+  /** 若是 batch 会话返回全部 boards，否则 null */
+  boards: Board[] | null;
+}
+
+export function getActiveContext(session: AuditSession | null | undefined): ActiveContext | null {
+  if (!session) return null;
+  const version = getCurrentVersion(session);
+
+  if (isBatchSession(session) && version.boards && version.boards.length > 0) {
+    const board = getActiveBoard(session);
+    return {
+      iosImage: board?.iosImage ?? null,
+      androidImage: board?.androidImage ?? null,
+      designImage: board?.designImage ?? null,
+      designFigma: board?.designFigma ?? null,
+      crossPlatformResult: board?.crossPlatformResult ?? null,
+      iosRegions: [],
+      androidRegions: [],
+      activeBoard: board,
+      boards: version.boards,
+    };
+  }
+
+  // 单画板走查：从 version 顶层字段读
+  return {
+    iosImage: version.iosImage ?? null,
+    androidImage: version.androidImage ?? null,
+    designImage: version.designRefImage ?? null,
+    designFigma: null,
+    crossPlatformResult: version.crossPlatformResult ?? null,
+    iosRegions: version.iosRegions ?? [],
+    androidRegions: version.androidRegions ?? [],
+    activeBoard: null,
+    boards: null,
+  };
+}
+
+// ─── Board 变更（P2/P3 会用到；P1 先定义好 API） ──────────────────────────
+
+/** 切换当前版本的激活 board */
+export function setActiveBoardId(session: AuditSession, boardId: string): AuditSession {
+  return updateCurrentVersion(session, { activeBoardId: boardId });
+}
+
+/** 更新当前版本某个 board 的部分字段（不可变更新） */
+export function updateBoardInCurrentVersion(
+  session: AuditSession,
+  boardId: string,
+  patch: Partial<Board>,
+): AuditSession {
+  const idx = session.currentVersionIndex;
+  const newVersions = session.versions.map((v, i) => {
+    if (i !== idx || !v.boards) return v;
+    const newBoards = v.boards.map((b) => (b.id === boardId ? { ...b, ...patch } : b));
+    return { ...v, boards: newBoards };
+  });
+  return { ...session, versions: newVersions };
+}
+
+/** 向当前版本追加一个 board（activeBoardId 自动切到新增的） */
+export function addBoardToCurrentVersion(session: AuditSession, board: Board): AuditSession {
+  const idx = session.currentVersionIndex;
+  const newVersions = session.versions.map((v, i) => {
+    if (i !== idx) return v;
+    const boards = v.boards ?? [];
+    return { ...v, boards: [...boards, board], activeBoardId: board.id };
+  });
+  return { ...session, versions: newVersions };
+}
+
+/** 从当前版本移除一个 board；若移除的是激活 board，自动切到第一个剩余 board */
+export function removeBoardFromCurrentVersion(session: AuditSession, boardId: string): AuditSession {
+  const idx = session.currentVersionIndex;
+  const newVersions = session.versions.map((v, i) => {
+    if (i !== idx || !v.boards) return v;
+    const newBoards = v.boards.filter((b) => b.id !== boardId);
+    const newActiveId =
+      v.activeBoardId === boardId ? newBoards[0]?.id : v.activeBoardId;
+    return { ...v, boards: newBoards, activeBoardId: newActiveId };
+  });
+  return { ...session, versions: newVersions };
+}
+

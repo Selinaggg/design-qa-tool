@@ -7,7 +7,7 @@
 
 import type { AuditSession } from '@/components/workbench/types';
 import type { NormalizedRect } from '@/lib/crossPlatform/types';
-import { getCurrentVersion, type VersionDiff } from '@/lib/sessionHelpers';
+import { getCurrentVersion, getActiveContext, type VersionDiff } from '@/lib/sessionHelpers';
 
 // ── 下载辅助 ─────────────────────────────────────────────────────────────
 
@@ -58,7 +58,8 @@ function statusLabel(s: string): string {
 
 export function buildMarkdown(session: AuditSession): string {
   const cur = getCurrentVersion(session);
-  const result = cur.crossPlatformResult;
+  const ctx = getActiveContext(session);
+  const result = ctx?.crossPlatformResult ?? cur.crossPlatformResult;
   if (!result) return '';
 
   const date = new Date(cur.createdAt).toLocaleString('zh-CN', {
@@ -70,10 +71,10 @@ export function buildMarkdown(session: AuditSession): string {
   });
 
   // 图片自然尺寸（真实像素）—— 用于把归一化坐标换算成 px
-  const iosW = cur.iosImage?.width ?? 0;
-  const iosH = cur.iosImage?.height ?? 0;
-  const andW = cur.androidImage?.width ?? 0;
-  const andH = cur.androidImage?.height ?? 0;
+  const iosW = ctx?.iosImage?.width ?? cur.iosImage?.width ?? 0;
+  const iosH = ctx?.iosImage?.height ?? cur.iosImage?.height ?? 0;
+  const andW = ctx?.androidImage?.width ?? cur.androidImage?.width ?? 0;
+  const andH = ctx?.androidImage?.height ?? cur.androidImage?.height ?? 0;
 
   const lines: string[] = [];
 
@@ -311,16 +312,17 @@ export interface ReportJSON {
 
 export function buildJSON(session: AuditSession): ReportJSON {
   const cur = getCurrentVersion(session);
-  const result = cur.crossPlatformResult!;
+  const ctx = getActiveContext(session);
+  const result = (ctx?.crossPlatformResult ?? cur.crossPlatformResult)!;
   const { summary } = result;
   const total = summary.critical + summary.high + summary.medium + summary.low;
 
-  const iosW = cur.iosImage?.width ?? 0;
-  const iosH = cur.iosImage?.height ?? 0;
-  const andW = cur.androidImage?.width ?? 0;
-  const andH = cur.androidImage?.height ?? 0;
-  const dsW = cur.designRefImage?.width ?? 0;
-  const dsH = cur.designRefImage?.height ?? 0;
+  const iosW = ctx?.iosImage?.width ?? cur.iosImage?.width ?? 0;
+  const iosH = ctx?.iosImage?.height ?? cur.iosImage?.height ?? 0;
+  const andW = ctx?.androidImage?.width ?? cur.androidImage?.width ?? 0;
+  const andH = ctx?.androidImage?.height ?? cur.androidImage?.height ?? 0;
+  const dsW = ctx?.designImage?.width ?? cur.designRefImage?.width ?? 0;
+  const dsH = ctx?.designImage?.height ?? cur.designRefImage?.height ?? 0;
 
   return {
     meta: {

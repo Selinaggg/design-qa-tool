@@ -21,7 +21,7 @@ import {
   pdf,
 } from '@react-pdf/renderer';
 import type { AuditSession } from '@/components/workbench/types';
-import { getCurrentVersion } from '@/lib/sessionHelpers';
+import { getCurrentVersion, getActiveContext } from '@/lib/sessionHelpers';
 import type { PlatformConsistencyIssue } from '@/lib/crossPlatform';
 
 // ── 注册本地思源黑体（OTF），避免 CDN 404 / CORS 问题 ────────────────────
@@ -361,7 +361,8 @@ const s = StyleSheet.create({
 // 注意：pdf() 需要 ReactElement<DocumentProps>，所以这里返回 Document 元素本身
 function buildDocumentElement(session: AuditSession): React.ReactElement {
   const cur = getCurrentVersion(session);
-  const result = cur.crossPlatformResult!;
+  const ctx = getActiveContext(session);
+  const result = ctx?.crossPlatformResult ?? cur.crossPlatformResult!;
   const { summary } = result;
   const total = summary.critical + summary.high + summary.medium + summary.low;
   const date = new Date(cur.createdAt).toLocaleString('zh-CN', {
@@ -475,22 +476,22 @@ function buildDocumentElement(session: AuditSession): React.ReactElement {
           <>
             <View style={s.divider} />
             <Text style={s.sectionTitle}>标注区域</Text>
-            {(cur.iosRegions ?? []).length > 0 && (
+            {(ctx?.iosRegions ?? cur.iosRegions ?? []).length > 0 && (
               <RegionTable
                 title="iOS 标注"
-                regions={cur.iosRegions ?? []}
+                regions={ctx?.iosRegions ?? cur.iosRegions ?? []}
                 color="#3b82f6"
-                imgW={cur.iosImage?.width ?? 0}
-                imgH={cur.iosImage?.height ?? 0}
+                imgW={ctx?.iosImage?.width ?? cur.iosImage?.width ?? 0}
+                imgH={ctx?.iosImage?.height ?? cur.iosImage?.height ?? 0}
               />
             )}
-            {(cur.androidRegions ?? []).length > 0 && (
+            {(ctx?.androidRegions ?? cur.androidRegions ?? []).length > 0 && (
               <RegionTable
                 title="Android 标注"
-                regions={cur.androidRegions ?? []}
+                regions={ctx?.androidRegions ?? cur.androidRegions ?? []}
                 color="#22c55e"
-                imgW={cur.androidImage?.width ?? 0}
-                imgH={cur.androidImage?.height ?? 0}
+                imgW={ctx?.androidImage?.width ?? cur.androidImage?.width ?? 0}
+                imgH={ctx?.androidImage?.height ?? cur.androidImage?.height ?? 0}
               />
             )}
           </>
@@ -682,7 +683,9 @@ function formatDate(ts: number): string {
 
 export async function exportPDF(session: AuditSession): Promise<void> {
   const cur = getCurrentVersion(session);
-  if (!cur.crossPlatformResult) return;
+  const ctx = getActiveContext(session);
+  const result = ctx?.crossPlatformResult ?? cur.crossPlatformResult;
+  if (!result) return;
 
   const docElement = buildDocumentElement(session);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

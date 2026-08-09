@@ -21,6 +21,7 @@ import {
   addManualIssue,
   addNewVersion,
   autoLinkIssuesBySimilarity,
+  setActiveBoardId,
   setIssueLink,
   switchVersion,
   updateCurrentVersion,
@@ -226,6 +227,22 @@ export default function Home() {
     [activeSessionId],
   );
 
+  // 批量走查：切换 activeBoard（P2.7）
+  const handleSetActiveBoard = useCallback(
+    (boardId: string) => {
+      if (!activeSessionId) return;
+      setSessions((prev) =>
+        prev.map((s) => (s.id === activeSessionId ? setActiveBoardId(s, boardId) : s)),
+      );
+      // 切换画板时清联动态，避免误高亮
+      setHighlightedRegionName(null);
+      setHighlightedIssueId(null);
+      setManualMode('idle');
+      setManualDraft(null);
+    },
+    [activeSessionId],
+  );
+
   const handleUpdateSession = useCallback(
     (patch: Partial<AuditSession>) => {
       if (!activeSessionId) return;
@@ -352,6 +369,7 @@ export default function Home() {
           onNewAudit={handleOpenNewAudit}
           onAddVersion={handleAddVersion}
           onSwitchVersion={handleSwitchVersion}
+          onSetActiveBoard={handleSetActiveBoard}
           onUpdateSession={handleUpdateSession}
           onUpdateVersion={handleUpdateVersion}
           highlightedRegionName={highlightedRegionName}
@@ -374,6 +392,7 @@ export default function Home() {
           onDeleteIssue={handleDeleteIssue}
           onSetIssueLink={handleSetIssueLink}
           onAutoLinkAll={handleAutoLinkAll}
+          onSetActiveBoard={handleSetActiveBoard}
           manualMode={manualMode}
           manualDraft={manualDraft}
           onStartManual={handleStartManual}

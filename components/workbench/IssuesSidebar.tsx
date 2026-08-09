@@ -4,12 +4,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import ConsistencyIssueCard from '@/components/cross-platform/ConsistencyIssueCard';
 import { toneFromSeverity, type BadgeTone } from '@/components/comparison/IssueBadgeOverlay';
 import type { AuditSession } from './types';
+import type { ImageFile } from '@/types';
 import {
   getCurrentVersion,
   getPrevVersion,
   getFixedPrevIssues,
   getLinkedPrevIssueId,
   getIssueVersionStatus,
+  getActiveContext,
 } from '@/lib/sessionHelpers';
 import type { IssueSeverityCP, IssueStatusCP, IssueType, PlatformConsistencyIssue } from '@/lib/crossPlatform';
 import LinkIssueDialog from './LinkIssueDialog';
@@ -30,6 +32,8 @@ interface IssuesSidebarProps {
   onSetIssueLink?: (currentIssueId: string, prevIssueId: string | null) => void;
   /** 一键自动匹配未关联问题（基于相似度） */
   onAutoLinkAll?: () => void;
+  /** 批量走查：切换 activeBoard（P2.8 —— 全部画板视图下点击 issue 时先切板） */
+  onSetActiveBoard?: (boardId: string) => void;
 
   // ── 手工标注（方案 B MVP） ─────────────────────────────
   /** 手工标注模式：idle / drawing / editing */
@@ -85,6 +89,7 @@ export default function IssuesSidebar({
   onDeleteIssue,
   onSetIssueLink,
   onAutoLinkAll,
+  onSetActiveBoard,
   manualMode = 'idle',
   manualDraft,
   onStartManual,
@@ -96,6 +101,20 @@ export default function IssuesSidebar({
   // 关联弹窗
   const [linkTargetIssue, setLinkTargetIssue] = useState<PlatformConsistencyIssue | null>(null);
 
+  // ── P2.8：batch 会话的"当前画板 / 全部画板"视图切换 ──
+  const [scope, setScope] = useState<'active' | 'all'>('active');
+  const isBatch = session?.type === 'batch';
+  const boardCount = isBatch ? (getCurrentVersion(session!).boards?.length ?? 0) : 0;
+  const showScopeToggle = isBatch && boardCount >= 2;
+  // 切换会话或 boards 数变化时，回到 active（不用 useEffect：直接在 render 期通过 ref 检测变化并同步更新）
+  const lastSessionKeyRef = useRef<string | null>(null);
+  const currentKey = session ? `${session.id}::${boardCount}` : null;
+  if (lastSessionKeyRef.current !== currentKey) {
+    lastSessionKeyRef.current = currentKey;
+    if (scope !== 'active') setScope('active');
+  }
+  const effectiveScope: 'active' | 'all' = showScopeToggle ? scope : 'active';
+
   return (
     <aside className="w-[360px] min-w-[360px] flex-shrink-0 flex flex-col bg-white border-l border-slate-200">
       {/* Header */}
@@ -106,6 +125,34 @@ export default function IssuesSidebar({
           </h2>
         </div>
         {session && <SessionMeta session={session} />}
+        {showScopeToggle && (
+          <div className="flex items-center gap-1 rounded-md bg-slate-100 p-0.5 self-start">
+            <button
+              type="button"
+              onClick={() => setScope('active')}
+              className={`px-2 py-1 text-[11px] font-semibold rounded transition-colors ${
+                effectiveScope === 'active'
+                  ? 'bg-white text-slate-800 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+              title="仅显示当前画板的问题"
+            >
+              当前画板
+            </button>
+            <button
+              type="button"
+              onClick={() => setScope('all')}
+              className={`px-2 py-1 text-[11px] font-semibold rounded transition-colors ${
+                effectiveScope === 'all'
+                  ? 'bg-white text-slate-800 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+              title={`汇总全部 ${boardCount} 个画板的问题`}
+            >
+              全部画板 · {boardCount}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Content */}
@@ -151,6 +198,8 @@ export default function IssuesSidebar({
 
             <CrossPlatformIssues
               session={session}
+              scope={effectiveScope}
+              onSetActiveBoard={onSetActiveBoard}
               onHighlightRegion={onHighlightRegion}
               highlightedRegionName={highlightedRegionName}
               highlightedIssueId={highlightedIssueId}
@@ -180,7 +229,8 @@ export default function IssuesSidebar({
 
 function SessionMeta({ session }: { session: AuditSession }) {
   const cur = getCurrentVersion(session);
-  const r = cur.crossPlatformResult;
+  const ctx = getActiveContext(session);
+  const r = ctx?.crossPlatformResult ?? null;
 
   if (!r) return (
     <div className="flex items-center gap-2 pt-1">
@@ -234,6 +284,8 @@ function SessionMeta({ session }: { session: AuditSession }) {
 
 function CrossPlatformIssues({
   session,
+  scope,
+  onSetActiveBoard,
   onHighlightRegion,
   highlightedRegionName,
   highlightedIssueId,
@@ -244,6 +296,8 @@ function CrossPlatformIssues({
   onAutoLinkAll,
 }: {
   session: AuditSession;
+  scope: 'active' | 'all';
+  onSetActiveBoard?: (boardId: string) => void;
   onHighlightRegion?: (regionName: string | null) => void;
   highlightedRegionName?: string | null;
   highlightedIssueId?: string | null;
@@ -254,17 +308,58 @@ function CrossPlatformIssues({
   onAutoLinkAll?: () => void;
 }) {
   const cur = getCurrentVersion(session);
-  const r = cur.crossPlatformResult;
+  const ctx = getActiveContext(session);
   const prev = getPrevVersion(session);
-  // 当前版本截图（传给卡片做区域裁剪预览）
-  const iosImage = cur.iosImage ?? null;
-  const androidImage = cur.androidImage ?? null;
+
+  // 当前版本截图（active 视图传给卡片做区域裁剪预览；all 视图按 issue 所属 board 逐条取）
+  const activeIosImage = ctx?.iosImage ?? null;
+  const activeAndroidImage = ctx?.androidImage ?? null;
+
+  // ── P2.8：根据 scope 计算 issues 数据源 ─────────────────
+  // active 视图：单一 result
+  // all 视图：汇总所有 boards 的 issues，附加 board 上下文
+  type IssueWithBoard = PlatformConsistencyIssue & {
+    _boardId?: string;
+    _boardName?: string;
+    _boardIsActive?: boolean;
+    _boardIos?: ImageFile | null;
+    _boardAndroid?: ImageFile | null;
+  };
+
+  const { allIssues, hasAnyIssues } = useMemo(() => {
+    if (scope === 'active') {
+      const r = ctx?.crossPlatformResult ?? null;
+      const list = (r?.issues ?? []) as IssueWithBoard[];
+      return { allIssues: list, hasAnyIssues: list.length > 0 };
+    }
+    // all：汇总
+    const boards = cur.boards ?? [];
+    const activeId = cur.activeBoardId;
+    const merged: IssueWithBoard[] = [];
+    for (const b of boards) {
+      const bIssues = b.crossPlatformResult?.issues ?? [];
+      for (const iss of bIssues) {
+        merged.push({
+          ...iss,
+          _boardId: b.id,
+          _boardName: b.name,
+          _boardIsActive: b.id === activeId,
+          _boardIos: b.iosImage ?? null,
+          _boardAndroid: b.androidImage ?? null,
+        });
+      }
+    }
+    return { allIssues: merged, hasAnyIssues: merged.length > 0 };
+  }, [scope, ctx, cur]);
 
   // 类型 Tab
   const [typeTab, setTypeTab] = useState<TypeTab>('all');
 
-  // 已修复列表（上一版有、本版没关联）
-  const fixedPrev = useMemo(() => getFixedPrevIssues(session), [session]);
+  // 已修复列表（仅 active 视图）
+  const fixedPrev = useMemo(
+    () => (scope === 'active' ? getFixedPrevIssues(session) : []),
+    [scope, session],
+  );
   const prevIndexMap = useMemo(() => {
     const map = new Map<string, number>();
     prev?.crossPlatformResult?.issues.forEach((i, idx) => map.set(i.id, idx + 1));
@@ -273,27 +368,26 @@ function CrossPlatformIssues({
 
   const orderedIndex = useMemo(() => {
     const map = new Map<string, number>();
-    r?.issues.forEach((i, idx) => map.set(i.id, idx + 1));
+    allIssues.forEach((i, idx) => map.set(i.id, idx + 1));
     return map;
-  }, [r]);
+  }, [allIssues]);
 
-  // 各 type 计数（用于 Tab 徽章）；手工问题归入 'layout'（默认 type）
+  // 各 type 计数
   const typeCounts = useMemo(() => {
     const counts: Record<TypeTab, number> = {
       all: 0, layout: 0, style: 0, content: 0, interaction: 0, 'platform-specific': 0,
     };
-    r?.issues.forEach((i) => {
+    allIssues.forEach((i) => {
       counts.all++;
       counts[i.type]++;
     });
     return counts;
-  }, [r]);
+  }, [allIssues]);
 
   // 当前 Tab 过滤后的 issues
   const filteredIssues = useMemo(() => {
-    if (!r) return [];
-    return typeTab === 'all' ? r.issues : r.issues.filter((i) => i.type === typeTab);
-  }, [r, typeTab]);
+    return typeTab === 'all' ? allIssues : allIssues.filter((i) => i.type === typeTab);
+  }, [allIssues, typeTab]);
 
   const cardRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
 
@@ -303,12 +397,18 @@ function CrossPlatformIssues({
     el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [highlightedIssueId]);
 
-  if (!r || r.issues.length === 0) {
-    return <EmptyState text="尚未生成走查结果" hint="在中间面板运行跨端走查" />;
+  if (!hasAnyIssues) {
+    return (
+      <EmptyState
+        text={scope === 'all' ? '所有画板均无走查结果' : '尚未生成走查结果'}
+        hint={scope === 'all' ? '切到某个画板运行跨端走查' : '在中间面板运行跨端走查'}
+      />
+    );
   }
 
-  // 当前 tab 下是否有未关联问题（用于自动匹配提示）
-  const hasUnlinkedInTab = filteredIssues.some((i) => !cur.issueLinks?.[i.id]);
+  // 当前 tab 下是否有未关联问题（仅 active 视图；跨画板视图禁用一键匹配）
+  const hasUnlinkedInTab =
+    scope === 'active' && filteredIssues.some((i) => !cur.issueLinks?.[i.id]);
 
   return (
     <div className="flex flex-col">
@@ -355,8 +455,8 @@ function CrossPlatformIssues({
           </button>
         )}
 
-        {/* 一键自动匹配（v>=2 且当前 tab 下存在未关联问题时展示） */}
-        {prev && onAutoLinkAll && hasUnlinkedInTab && (
+        {/* 一键自动匹配（v>=2 且当前 tab 下存在未关联问题时展示；跨画板视图禁用） */}
+        {scope === 'active' && prev && onAutoLinkAll && hasUnlinkedInTab && (
           <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100">
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold text-blue-700">💡 一键匹配上版</p>
@@ -374,6 +474,16 @@ function CrossPlatformIssues({
           </div>
         )}
 
+        {/* 跨画板视图提示 */}
+        {scope === 'all' && (
+          <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-100 text-[11px] text-amber-800">
+            <span className="text-sm leading-none">ℹ️</span>
+            <div className="flex-1 min-w-0">
+              汇总全部画板的问题（只读）。点击卡片可跳转到对应画板；如需改状态或删除，请先切到该画板。
+            </div>
+          </div>
+        )}
+
         {/* 当前 tab 无问题时的空态 */}
         {filteredIssues.length === 0 && (
           <EmptyState text={`「${TYPE_TABS.find(t => t.value === typeTab)?.label}」类型暂无问题`} />
@@ -383,41 +493,87 @@ function CrossPlatformIssues({
         {filteredIssues.map((issue) => {
           const idx = orderedIndex.get(issue.id) ?? 0;
           const tone: BadgeTone = issue.manual ? 'purple' : toneFromSeverity(issue.severity, issue.status);
-          const linkedPrevId = getLinkedPrevIssueId(session, issue.id);
+          // 跨画板视图下不计算 linkedPrevLabel / vStatus（这些是 active board 的版本概念）
+          const linkedPrevId = scope === 'active' ? getLinkedPrevIssueId(session, issue.id) : null;
           const linkedPrevLabel = linkedPrevId && prev
             ? `v${prev.v} #${prevIndexMap.get(linkedPrevId) ?? '?'}`
             : null;
-          const vStatus = getIssueVersionStatus(session, issue.id);
+          const vStatus = scope === 'active' ? getIssueVersionStatus(session, issue.id) : undefined;
+
+          // scope='all' 时的 board 上下文
+          const boardId = issue._boardId;
+          const boardName = issue._boardName;
+          const boardIsActive = issue._boardIsActive;
+          const cardIos = scope === 'all' ? (issue._boardIos ?? null) : activeIosImage;
+          const cardAndroid = scope === 'all' ? (issue._boardAndroid ?? null) : activeAndroidImage;
+
+          // 点击处理：跨画板视图下，非 active board 的 issue 需要先切板
+          const handleSelect = () => {
+            if (scope === 'all' && boardId && !boardIsActive && onSetActiveBoard) {
+              onSetActiveBoard(boardId);
+            }
+            onHighlightIssue?.(issue.id);
+          };
+
           return (
-            <ConsistencyIssueCard
-              key={issue.id}
-              ref={(el) => {
-                cardRefs.current.set(issue.id, el);
-              }}
-              issue={issue}
-              index={idx}
-              toneColor={TONE_HEX[tone]}
-              isHighlighted={highlightedIssueId === issue.id}
-              forceExpanded={highlightedIssueId === issue.id ? true : undefined}
-              onSelect={() => onHighlightIssue?.(issue.id)}
-              onExpand={onHighlightRegion}
-              onStatusChange={
-                onUpdateIssueStatus
-                  ? (s: IssueStatusCP) => onUpdateIssueStatus(issue.id, s)
-                  : undefined
-              }
-              onDelete={onDeleteIssue ? () => onDeleteIssue(issue.id) : undefined}
-              versionStatus={vStatus}
-              linkedPrevLabel={linkedPrevLabel}
-              onLinkClick={onOpenLinkDialog ? () => onOpenLinkDialog(issue) : undefined}
-              iosImage={iosImage}
-              androidImage={androidImage}
-            />
+            <div key={issue.id} className="flex flex-col gap-1">
+              {scope === 'all' && boardName && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (boardId && !boardIsActive && onSetActiveBoard) {
+                      onSetActiveBoard(boardId);
+                    }
+                  }}
+                  className={`self-start inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${
+                    boardIsActive
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                  title={boardIsActive ? '当前画板' : '点击切换到该画板'}
+                >
+                  <span className="text-[9px] opacity-70">画板</span>
+                  <span className="max-w-[180px] truncate">{boardName}</span>
+                  {boardIsActive && <span className="text-[9px]">·当前</span>}
+                </button>
+              )}
+              <ConsistencyIssueCard
+                ref={(el) => {
+                  cardRefs.current.set(issue.id, el);
+                }}
+                issue={issue}
+                index={idx}
+                toneColor={TONE_HEX[tone]}
+                isHighlighted={highlightedIssueId === issue.id}
+                forceExpanded={highlightedIssueId === issue.id ? true : undefined}
+                onSelect={handleSelect}
+                onExpand={scope === 'active' ? onHighlightRegion : undefined}
+                onStatusChange={
+                  scope === 'active' && onUpdateIssueStatus
+                    ? (s: IssueStatusCP) => onUpdateIssueStatus(issue.id, s)
+                    : undefined
+                }
+                onDelete={
+                  scope === 'active' && onDeleteIssue
+                    ? () => onDeleteIssue(issue.id)
+                    : undefined
+                }
+                versionStatus={vStatus}
+                linkedPrevLabel={linkedPrevLabel}
+                onLinkClick={
+                  scope === 'active' && onOpenLinkDialog
+                    ? () => onOpenLinkDialog(issue)
+                    : undefined
+                }
+                iosImage={cardIos}
+                androidImage={cardAndroid}
+              />
+            </div>
           );
         })}
 
-        {/* 已修复分组（v>=2；不受 typeTab 过滤影响，始终显示全部已修复问题） */}
-        {prev && fixedPrev.length > 0 && (
+        {/* 已修复分组（v>=2；仅 active 视图；不受 typeTab 过滤影响） */}
+        {scope === 'active' && prev && fixedPrev.length > 0 && (
           <section className="flex flex-col gap-2 pt-2 border-t border-slate-100">
             <div className="flex items-center justify-between px-1">
               <h3 className="text-[11px] font-semibold uppercase tracking-wide text-emerald-600">

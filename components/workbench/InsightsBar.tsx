@@ -14,7 +14,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Button from '@/components/ui/Button';
 import { exportMarkdown, exportJSON } from '@/lib/exportReport';
-import { getCurrentVersion, getPrevVersion } from '@/lib/sessionHelpers';
+import { getPrevVersion, getActiveContext } from '@/lib/sessionHelpers';
 import type { AuditSession } from './types';
 interface InsightsBarProps {
   session: AuditSession;
@@ -43,7 +43,9 @@ export default function InsightsBar({
   onRunAudit,
   canRun,
 }: InsightsBarProps) {
-  const result = getCurrentVersion(session).crossPlatformResult ?? null;
+  const ctx = getActiveContext(session);
+  const result = ctx?.crossPlatformResult ?? null;
+  // 版本对比：单画板走查用版本级 result；batch 场景的跨版本对比暂不实现
   const prevResult = getPrevVersion(session)?.crossPlatformResult ?? null;
   const hasResult = !!result;
   const totalIssues = result ? result.issues.length : 0;
