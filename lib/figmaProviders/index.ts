@@ -22,4 +22,11 @@ export function getFigmaProvider(): FigmaProvider {
   return new MockFigmaProvider();
 }
 
-export type { FigmaProvider, FigmaExportRequest, FigmaExportResult } from './types';
+export type {
+  FigmaProvider,
+  FigmaExportRequest,
+  FigmaExportResult,
+  ListFramesRequest,
+  ListFramesResult,
+  FigmaFrameSummary,
+} from './types';

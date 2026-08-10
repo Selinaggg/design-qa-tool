@@ -102,7 +102,12 @@ export default function WorkbenchMain({
   manualMode = 'idle',
   onStartManual,
 }: WorkbenchMainProps) {
-  const [auditing, setAuditing] = useState(false);
+  // 两个独立的执行状态，防止 UI 撒谎（点此板时批量按钮不该转圈，反之亦然）
+  //  · singleAuditing：右上"重跑此板 / 重新走查"
+  //  · batchAuditing：左上"批量执行 / 增量执行 / 全部重跑"
+  // 两者互斥：任一进行时另一个都 disabled，避免并发调 API 撞速率
+  const [singleAuditing, setSingleAuditing] = useState(false);
+  const [batchAuditing, setBatchAuditing] = useState(false);
   // P4.1：批量执行进度 { done, total, currentBoardName }；null = 空闲
   const [batchProgress, setBatchProgress] = useState<{
     done: number;
@@ -152,7 +157,7 @@ export default function WorkbenchMain({
     const iosRegions = ctx.iosRegions;
     const androidRegions = ctx.androidRegions;
     const targetRegions = mergeRegions(iosRegions, androidRegions);
-    setAuditing(true);
+    setSingleAuditing(true);
     try {
       const res = await fetch('/api/cross-platform-audit', {
         method: 'POST',
@@ -184,7 +189,7 @@ export default function WorkbenchMain({
     } catch (err) {
       alert(err instanceof Error ? err.message : '走查失败');
     } finally {
-      setAuditing(false);
+      setSingleAuditing(false);
     }
   }, [session, onUpdateVersion, onUpdateBoard]);
 
@@ -223,7 +228,7 @@ export default function WorkbenchMain({
     const targets = overwrite ? runnable : runnable.filter((b) => !b.crossPlatformResult);
     if (targets.length === 0) return;
 
-    setAuditing(true);
+    setBatchAuditing(true);
     setBatchProgress({ done: 0, total: targets.length, currentBoardName: targets[0].name });
     try {
       for (let i = 0; i < targets.length; i++) {
@@ -257,7 +262,7 @@ export default function WorkbenchMain({
         currentBoardName: '',
       });
     } finally {
-      setAuditing(false);
+      setBatchAuditing(false);
       // 短暂延迟后清进度条（让用户看到 100%）
       setTimeout(() => setBatchProgress(null), 1500);
     }
@@ -303,7 +308,8 @@ export default function WorkbenchMain({
       {session && session.type === 'batch' && onUpdateBoard && (
         <BatchAuditBar
           session={session}
-          auditing={auditing}
+          auditing={batchAuditing}
+          disabledByOther={singleAuditing}
           progress={batchProgress}
           onRunBatch={handleBatchAudit}
         />
@@ -313,7 +319,8 @@ export default function WorkbenchMain({
       {session && (
         <WorkbenchToolBar
           session={session}
-          auditing={auditing}
+          auditing={singleAuditing}
+          disabledByOther={batchAuditing}
           canRun={canRun}
           onRunAudit={handleAudit}
           viewMode={viewMode}
@@ -685,6 +692,7 @@ function MissingAssets({ text }: { text: string }) {
 function WorkbenchToolBar({
   session,
   auditing,
+  disabledByOther,
   canRun,
   onRunAudit,
   viewMode,
@@ -703,6 +711,8 @@ function WorkbenchToolBar({
 }: {
   session: AuditSession;
   auditing: boolean;
+  /** 对方（批量按钮）在跑；仅禁用不转圈 */
+  disabledByOther?: boolean;
   canRun: boolean;
   onRunAudit: () => void;
   viewMode: ViewMode;
@@ -726,6 +736,18 @@ function WorkbenchToolBar({
   const onlyAndroid = !ctx?.iosImage && !!ctx?.androidImage;
   const isSinglePlatform = onlyIos || onlyAndroid;
   const isManualActive = manualMode !== 'idle';
+  // A+C 融合：批量会话时右上按钮语义变"仅当前板"
+  const isBatch = session.type === 'batch';
+  const runBtnLabel = hasResult
+    ? isBatch
+      ? '重跑此板'
+      : '重新走查'
+    : isBatch
+      ? '走查此板'
+      : '开始走查';
+  const runBtnTitle = isBatch
+    ? '仅重跑当前画板；如需批量执行请点顶部「批量执行走查」按钮'
+    : undefined;
 
   // 分隔线
   const TBDivider = () => <div className="w-px h-4 bg-slate-200 flex-shrink-0 mx-0.5" />;
@@ -915,9 +937,10 @@ function WorkbenchToolBar({
       <button
         type="button"
         onClick={onRunAudit}
-        disabled={!canRun || auditing}
+        disabled={!canRun || auditing || disabledByOther}
+        title={disabledByOther ? '批量执行进行中，请等待完成' : runBtnTitle}
         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
-          !canRun || auditing
+          !canRun || auditing || disabledByOther
             ? 'text-slate-300 cursor-not-allowed'
             : hasResult
               ? 'text-slate-600 hover:bg-slate-100'
@@ -932,7 +955,7 @@ function WorkbenchToolBar({
             </svg>
             走查中…
           </>
-        ) : hasResult ? '重新走查' : '开始走查'}
+        ) : runBtnLabel}
       </button>
     </div>
   );
@@ -1319,11 +1342,14 @@ function EmptyWorkbench({ onNewAudit }: { onNewAudit: () => void }) {
 function BatchAuditBar({
   session,
   auditing,
+  disabledByOther,
   progress,
   onRunBatch,
 }: {
   session: AuditSession;
   auditing: boolean;
+  /** 对方（此板按钮）在跑；仅禁用不转圈 */
+  disabledByOther?: boolean;
   progress: { done: number; total: number; currentBoardName: string } | null;
   onRunBatch: () => void;
 }) {
@@ -1343,29 +1369,47 @@ function BatchAuditBar({
   });
   const alreadyRun = boards.filter((b) => !!b.crossPlatformResult).length;
   const pending = runnable.filter((b) => !b.crossPlatformResult).length;
-  const canRun = runnable.length > 0 && !auditing;
+  const canRun = runnable.length > 0 && !auditing && !disabledByOther;
 
-  // P4.2：调用次数预估（增量执行下 = pending；全量重跑 = runnable.length）
-  const estimatedCalls = pending; // 默认按增量算，用户确认覆盖时再全跑
+  // A+C 融合：三态视觉降权
+  //  · pending > 0 & alreadyRun == 0：蓝色主按钮 "批量执行走查 (N)"
+  //  · pending > 0 & alreadyRun > 0：蓝色主按钮 "增量执行 (N)"（用户还没跑完，主流程继续）
+  //  · pending == 0 & alreadyRun > 0：淡灰次按钮 "⚠ 全部重跑 (N)"（破坏性操作，降权）
+  const estimatedCalls = pending;
+  const allDone = pending === 0 && alreadyRun > 0;
   const buttonLabel =
     alreadyRun === 0
       ? `批量执行走查（${runnable.length}）`
       : pending > 0
         ? `增量执行（${pending} 个待走查）`
-        : `重新执行（${runnable.length} 个）`;
+        : `全部重跑（${runnable.length}）`;
+  const buttonClass = allDone
+    ? // 破坏性次按钮：淡灰边框 + 悬停变红
+      'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 bg-white text-slate-500 hover:border-red-300 hover:text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors'
+    : // 主流程蓝色按钮
+      'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm';
+  const buttonTitle = disabledByOther
+    ? '当前正在走查此板，请等待完成'
+    : !canRun
+      ? runnable.length === 0
+        ? '没有可走查的画板'
+        : '正在执行中'
+      : allDone
+        ? `⚠ 将覆盖已有的 ${runnable.length} 份结果，请谨慎`
+        : `本次预计消耗 ${estimatedCalls} 次 API 调用（每画板一次）`;
 
   return (
-    <div className="flex items-center gap-3 px-6 py-2 border-b border-slate-200 bg-blue-50/40 flex-shrink-0">
+    <div
+      className={`flex items-center gap-3 px-6 py-2 border-b border-slate-200 flex-shrink-0 ${
+        allDone ? 'bg-slate-50/60' : 'bg-blue-50/40'
+      }`}
+    >
       <button
         type="button"
         onClick={onRunBatch}
         disabled={!canRun}
-        title={
-          canRun
-            ? `本次预计消耗 ${estimatedCalls} 次 API 调用（每画板一次）`
-            : '没有可走查的画板'
-        }
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
+        title={buttonTitle}
+        className={buttonClass}
       >
         {auditing ? (
           <>
@@ -1387,14 +1431,27 @@ function BatchAuditBar({
           </>
         ) : (
           <>
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M5 3l14 9-14 9V3z"
-              />
-            </svg>
+            {allDone ? (
+              // ⚠ 警示图标，暗示破坏性
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01M4.93 19h14.14a2 2 0 001.71-3l-7.07-12a2 2 0 00-3.42 0l-7.07 12a2 2 0 001.71 3z"
+                />
+              </svg>
+            ) : (
+              // ▶ 播放图标，主流程
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 3l14 9-14 9V3z"
+                />
+              </svg>
+            )}
             {buttonLabel}
           </>
         )}

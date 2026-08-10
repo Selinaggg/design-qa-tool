@@ -1,4 +1,11 @@
-import type { FigmaProvider, FigmaExportRequest, FigmaExportResult } from './types';
+import type {
+  FigmaProvider,
+  FigmaExportRequest,
+  FigmaExportResult,
+  ListFramesRequest,
+  ListFramesResult,
+  FigmaFrameSummary,
+} from './types';
 
 /**
  * Real Figma provider — uses the Figma REST API to export a frame as PNG.
@@ -88,6 +95,111 @@ export class RealFigmaProvider implements FigmaProvider {
       width,
       height,
       fileName: `${fileName}.png`,
+      isMock: false,
+    };
+  }
+
+  /**
+   * 列出文件下所有顶级 FRAME（画板）：
+   *  1) GET /v1/files/{key} 拉整棵树
+   *  2) 遍历 document.children (CANVAS/pages) → children (顶级 FRAME/COMPONENT/COMPONENT_SET)
+   *  3) 批量拉缩略图 GET /v1/images/{key}?ids=id1,id2,...&format=png&scale={scale}
+   *
+   * 只收 FRAME/COMPONENT/COMPONENT_SET（跳过 GROUP/RECTANGLE 之类，避免噪音）
+   */
+  async listFrames(req: ListFramesRequest): Promise<ListFramesResult> {
+    const { fileKey } = parseFigmaUrl(req.figmaUrl);
+    const scale = req.scale ?? 1;
+
+    // 1) 拉文件结构
+    const fileRes = await fetch(
+      `https://api.figma.com/v1/files/${encodeURIComponent(fileKey)}`,
+      { headers: { 'X-Figma-Token': this.token } },
+    );
+    if (!fileRes.ok) {
+      const text = await fileRes.text().catch(() => '');
+      throw new Error(`Figma files API 失败 (${fileRes.status}): ${text || fileRes.statusText}`);
+    }
+    interface FigmaNode {
+      id: string;
+      name: string;
+      type: string;
+      children?: FigmaNode[];
+      absoluteBoundingBox?: { width: number; height: number };
+    }
+    const fileData = (await fileRes.json()) as {
+      name: string;
+      document: FigmaNode;
+    };
+
+    // 2) 遍历顶级 frames，按 page 分组
+    const frames: FigmaFrameSummary[] = [];
+    const canvases = fileData.document?.children ?? [];
+    const collectTypes = new Set(['FRAME', 'COMPONENT', 'COMPONENT_SET']);
+    for (const canvas of canvases) {
+      if (canvas.type !== 'CANVAS') continue;
+      const pageName = canvas.name;
+      for (const child of canvas.children ?? []) {
+        if (!collectTypes.has(child.type)) continue;
+        frames.push({
+          nodeId: child.id,
+          name: child.name,
+          pageName,
+          thumbnailUrl: '', // 下一步批量填
+          width: Math.round(child.absoluteBoundingBox?.width ?? 0),
+          height: Math.round(child.absoluteBoundingBox?.height ?? 0),
+        });
+      }
+    }
+
+    if (frames.length === 0) {
+      return {
+        fileKey,
+        fileName: fileData.name ?? 'Untitled',
+        frames: [],
+        isMock: false,
+      };
+    }
+
+    // 3) 批量拉缩略图（Figma 单次 /v1/images 支持逗号分隔多个 id，实测 100+ 也 OK）
+    // 大文件保险起见，分批（每批 100 个）
+    const BATCH = 100;
+    const thumbMap: Record<string, string> = {};
+    for (let i = 0; i < frames.length; i += BATCH) {
+      const batch = frames.slice(i, i + BATCH);
+      const ids = batch.map((f) => f.nodeId).join(',');
+      const imgRes = await fetch(
+        `https://api.figma.com/v1/images/${encodeURIComponent(fileKey)}?ids=${encodeURIComponent(
+          ids,
+        )}&format=png&scale=${scale}`,
+        { headers: { 'X-Figma-Token': this.token } },
+      );
+      if (!imgRes.ok) {
+        // 缩略图失败不阻断，让 UI 显示占位
+        console.warn(`[figma] 缩略图批次 ${i}-${i + batch.length} 拉取失败: ${imgRes.status}`);
+        continue;
+      }
+      const imgData = (await imgRes.json()) as {
+        err?: string | null;
+        images: Record<string, string | null>;
+      };
+      if (imgData.err) {
+        console.warn(`[figma] 缩略图批次 ${i} 返回 err: ${imgData.err}`);
+        continue;
+      }
+      for (const [id, url] of Object.entries(imgData.images)) {
+        if (url) thumbMap[id] = url;
+      }
+    }
+
+    for (const f of frames) {
+      f.thumbnailUrl = thumbMap[f.nodeId] ?? '';
+    }
+
+    return {
+      fileKey,
+      fileName: fileData.name ?? 'Untitled',
+      frames,
       isMock: false,
     };
   }
