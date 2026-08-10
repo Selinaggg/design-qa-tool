@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAIProvider } from '@/lib/aiProviders';
+import { getAIProvider, readAIOverrideFromHeaders } from '@/lib/aiProviders';
 import type { AnalyzeRequest } from '@/lib/aiProviders';
 
 export async function POST(req: NextRequest) {
@@ -10,7 +10,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid request: spec must be a string.' }, { status: 400 });
     }
 
-    const provider = getAIProvider();
+    const override = readAIOverrideFromHeaders(req.headers);
+    const provider = getAIProvider(override);
     const result = await provider.analyze(body);
 
     return NextResponse.json({ ...result, _provider: provider.name });

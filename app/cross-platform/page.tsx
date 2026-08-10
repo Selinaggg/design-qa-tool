@@ -22,6 +22,7 @@ import type {
   TargetRegion,
 } from '@/lib/crossPlatform';
 import type { ImageFile } from '@/types';
+import { buildAIHeaders } from '@/lib/aiConfig';
 
 const SEVERITY_ORDER: IssueSeverityCP[] = ['critical', 'high', 'medium', 'low'];
 const SCENARIO_PRESETS = ['登录页', '首页', '商品详情页', '购物车', '个人中心'];
@@ -112,7 +113,10 @@ export default function CrossPlatformPage() {
     try {
       const res = await fetch('/api/cross-platform-audit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...buildAIHeaders(),
+        },
         body: JSON.stringify({
           scenario: {
             id: `scenario-${Date.now()}`,

@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import type { AnalysisResult } from '@/types';
 import type { DiffResult } from '@/lib/diffEngine';
+import { buildAIHeaders } from '@/lib/aiConfig';
 
 export type AnalysisResponse = AnalysisResult & { _provider: string };
 
@@ -27,7 +28,10 @@ export function useAnalysis(): UseAnalysisReturn {
     try {
       const res = await fetch('/api/analyze', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...buildAIHeaders(),
+        },
         body: JSON.stringify({
           spec,
           diffBase64: diffResult?.diffUrl ?? null,

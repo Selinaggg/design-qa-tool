@@ -8,6 +8,12 @@ export interface FigmaExportResult {
   height: number;
   fileName: string;
   isMock: boolean;
+  /**
+   * 该 frame 的精简设计 spec（色值/尺寸/字体/圆角/阴影/描边）；
+   * 用于喂 AI 做走查时提供"设计真相"，避免只从像素反推。
+   * mock provider / 无 token / 拉取失败时为 undefined。
+   */
+  spec?: import('./figmaSpecTypes').FigmaNodeSpec;
 }
 
 /**

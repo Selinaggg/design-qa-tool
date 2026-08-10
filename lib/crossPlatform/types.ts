@@ -95,6 +95,14 @@ export interface PlatformConsistencyIssue {
   confidence: number;
   /** true = 用户手工标注；false / undefined = AI 检测 */
   manual?: boolean;
+  /**
+   * 多模型交叉验证时：这个 issue 由哪个/哪些模型发现
+   *  - 单模型运行：undefined（跟 discovery 无关）
+   *  - 只主模型发现：主 provider 名（'claude' / 'openai' / 'maas' / 'maas-direct'）
+   *  - 只副模型发现：副 provider 名
+   *  - 两个模型都发现：'both'
+   */
+  discoveredBy?: string;
 }
 
 // ── Request / Response ────────────────────────────────────────────────────
@@ -103,6 +111,23 @@ export interface AuditOptions {
   ignoreStatusBar: boolean;
   ignoreBottomSafeArea: boolean;
   useNormalizedCoordinates: boolean;
+
+  /**
+   * 已勾选的忽略规则 id 列表（见 lib/crossPlatform/ignoreRules.ts）
+   * 例：['dyn-numbers', 'user-content', 'live-danmaku', 'ecom-price']
+   * undefined / 空数组 → prompt 里不加动态内容忽略章节
+   */
+  ignoreRules?: string[];
+
+  // ── @deprecated 旧字段，仅为兼容旧 session 保留读；新代码不要写 ──
+  /** @deprecated 用 ignoreRules 里的 'dyn-numbers' 代替 */
+  ignoreDynamicNumbers?: boolean;
+  /** @deprecated 用 ignoreRules 里的 'user-content' 代替 */
+  ignoreUserContent?: boolean;
+  /** @deprecated 用 ignoreRules 里的 'live-stream-view' 等具体维度代替 */
+  ignoreMediaContent?: boolean;
+  /** @deprecated 用 ignoreRules 里的 'status-badges' 代替 */
+  ignoreStatusBadges?: boolean;
 }
 
 export interface CrossPlatformAuditRequest {
@@ -113,6 +138,12 @@ export interface CrossPlatformAuditRequest {
   androidImageUrl?: string;
   /** 设计稿 URL；双端时可选，单端时必需（作为对比基线） */
   designImageUrl?: string;
+  /**
+   * 设计稿的精简 Figma spec（色值/字号/圆角/尺寸/阴影）；
+   * 有时提供给 AI 作为"设计真相"，让走查从"像素反推"升级为"精确比对"。
+   * 只有设计稿来自 Figma 时才有值；上传的图片没有此字段。
+   */
+  designFigmaSpec?: import('../figmaProviders/figmaSpecTypes').FigmaNodeSpec;
   /** iOS 设备配置；iOS 截图存在时应传 */
   iosDevice?: DeviceProfile;
   /** Android 设备配置；Android 截图存在时应传 */

@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCrossPlatformAnalyzer } from '@/lib/crossPlatform';
+import {
+  getCrossPlatformAnalyzer,
+  readCrossPlatformOverrideFromHeaders,
+} from '@/lib/crossPlatform';
 import type { CrossPlatformAuditRequest } from '@/lib/crossPlatform';
 
 export async function POST(req: NextRequest) {
@@ -44,7 +47,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const analyzer = getCrossPlatformAnalyzer();
+    const analyzer = getCrossPlatformAnalyzer(readCrossPlatformOverrideFromHeaders(req.headers));
     const result = await analyzer.analyze(body);
 
     return NextResponse.json({ ...result, _analyzer: analyzer.name });

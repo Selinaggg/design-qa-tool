@@ -43,6 +43,7 @@ export default function FigmaImport({ onImageLoad }: FigmaImportProps) {
         width,
         height,
         source: 'figma',
+        figmaSpec: data.spec,
       });
       setIsMock(Boolean(data.isMock));
       setUrl('');

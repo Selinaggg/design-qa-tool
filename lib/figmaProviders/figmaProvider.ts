@@ -6,6 +6,8 @@ import type {
   ListFramesResult,
   FigmaFrameSummary,
 } from './types';
+import { extractFigmaSpec } from './figmaSpec';
+import type { FigmaNodeSpec } from './figmaSpecTypes';
 
 /**
  * Real Figma provider — uses the Figma REST API to export a frame as PNG.
@@ -60,10 +62,11 @@ export class RealFigmaProvider implements FigmaProvider {
       );
     }
 
-    // 2) 获取 frame 尺寸（走 nodes API）
+    // 2) 获取 frame 尺寸 + 精简设计 spec（走 nodes API，一次调用双收）
     let width = 0;
     let height = 0;
     let fileName = 'figma-frame';
+    let spec: FigmaNodeSpec | undefined;
     try {
       const nodesRes = await fetch(
         `https://api.figma.com/v1/files/${encodeURIComponent(fileKey)}/nodes?ids=${encodeURIComponent(
@@ -76,15 +79,29 @@ export class RealFigmaProvider implements FigmaProvider {
           name?: string;
           nodes: Record<
             string,
-            { document?: { name?: string; absoluteBoundingBox?: { width: number; height: number } } } | null
+            { document?: unknown } | null
           >;
         };
-        const doc = nodesData.nodes[nodeId]?.document;
+        const doc = nodesData.nodes[nodeId]?.document as
+          | {
+              name?: string;
+              absoluteBoundingBox?: { width: number; height: number };
+            }
+          | undefined;
         if (doc?.absoluteBoundingBox) {
           width = Math.round(doc.absoluteBoundingBox.width);
           height = Math.round(doc.absoluteBoundingBox.height);
         }
         if (doc?.name) fileName = doc.name;
+        // 提取精简 spec（供 AI 走查用）
+        if (doc) {
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            spec = extractFigmaSpec(doc as any);
+          } catch (err) {
+            console.warn('[figma] spec 提取失败，将只用图片：', err);
+          }
+        }
       }
     } catch {
       // 尺寸获取失败不阻断；调用方会用 probe fallback
@@ -96,6 +113,7 @@ export class RealFigmaProvider implements FigmaProvider {
       height,
       fileName: `${fileName}.png`,
       isMock: false,
+      spec,
     };
   }
 

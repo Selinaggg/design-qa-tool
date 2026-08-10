@@ -9,6 +9,12 @@ export interface ImageFile {
    * - 'figma'：通过 /api/figma-export 从 Figma 拉取；未来 P4 可据此实现"刷新"能力
    */
   source?: 'upload' | 'figma';
+  /**
+   * 来自 Figma 时的精简设计 spec（色值/字号/圆角/尺寸）；
+   * 单画板模式通过 FigmaImport 拉取时会写入，供 AI 走查作为"设计真相"参考。
+   * upload 图片始终为 undefined。
+   */
+  figmaSpec?: import('@/lib/figmaProviders/figmaSpecTypes').FigmaNodeSpec;
 }
 
 export type ComparisonMode = 'side-by-side' | 'slider' | 'diff';

@@ -150,6 +150,14 @@ const ConsistencyIssueCard = forwardRef<HTMLDivElement, ConsistencyIssueCardProp
               📝 手工
             </span>
           )}
+          {issue.discoveredBy && (
+            <span
+              className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ring-1 flex-shrink-0 ${discoveredByStyle(issue.discoveredBy)}`}
+              title={discoveredByTitle(issue.discoveredBy)}
+            >
+              {discoveredByLabel(issue.discoveredBy)}
+            </span>
+          )}
           <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0 ${STATUS_STYLE[status]}`}>
             {STATUS_LABEL[status]}
           </span>
@@ -414,7 +422,7 @@ function CompactRow({ label, text, highlight }: { label: string; text: string; h
         className="text-xs text-slate-700 leading-relaxed break-words"
         style={{
           display: '-webkit-box',
-          WebkitLineClamp: 3,
+           WebkitLineClamp: 3,
           WebkitBoxOrient: 'vertical',
           overflow: 'hidden',
         }}
@@ -423,4 +431,35 @@ function CompactRow({ label, text, highlight }: { label: string; text: string; h
       </span>
     </div>
   );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 多模型交叉验证：discoveredBy badge 样式
+// ═══════════════════════════════════════════════════════════════════════════
+
+function discoveredByLabel(who: string): string {
+  if (who === 'both') return '✓✓ 双模确认';
+  return `${providerShortName(who)}`;
+}
+
+function discoveredByStyle(who: string): string {
+  if (who === 'both') return 'bg-emerald-100 text-emerald-700 ring-emerald-200';
+  // 单模型发现：中性灰底 + provider 家族色
+  if (who.startsWith('maas') || who === 'openai') return 'bg-amber-50 text-amber-700 ring-amber-200';
+  return 'bg-sky-50 text-sky-700 ring-sky-200';
+}
+
+function discoveredByTitle(who: string): string {
+  if (who === 'both') return '两个模型都发现了这个问题，置信度更高';
+  return `仅由 ${providerShortName(who)} 发现（对方模型未识别）`;
+}
+
+function providerShortName(who: string): string {
+  const map: Record<string, string> = {
+    claude: 'Claude',
+    openai: 'GPT',
+    maas: 'MaaS-Claude',
+    'maas-direct': 'Qwen',
+  };
+  return map[who] || who;
 }

@@ -13,6 +13,8 @@ import { toneFromSeverity, type BadgeItem } from '@/components/comparison/IssueB
 import type { AuditSession, AuditVersion, Board } from './types';
 import { MAX_VERSIONS } from './types';
 import { getCurrentVersion, canAddVersion, getActiveContext } from '@/lib/sessionHelpers';
+import { buildAIHeaders, loadAIConfig } from '@/lib/aiConfig';
+import { toCompressedDataUrl } from '@/lib/imageUrlToBase64';
 import type {
   CrossPlatformAuditResult,
   DrawingRegion,
@@ -159,18 +161,32 @@ export default function WorkbenchMain({
     const targetRegions = mergeRegions(iosRegions, androidRegions);
     setSingleAuditing(true);
     try {
+      // 用真实 AI 时把 blob URL 转成 data URL；mock 不用（省性能）
+      const useReal = loadAIConfig().provider !== 'mock';
+      const [iosUrl, androidUrl, designUrl] = useReal
+        ? await Promise.all([
+            toCompressedDataUrl(ctx.iosImage?.url),
+            toCompressedDataUrl(ctx.androidImage?.url),
+            toCompressedDataUrl(ctx.designImage?.url ?? ctx.designFigma?.imageUrl),
+          ])
+        : [ctx.iosImage?.url, ctx.androidImage?.url, ctx.designImage?.url ?? ctx.designFigma?.imageUrl];
+
       const res = await fetch('/api/cross-platform-audit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...buildAIHeaders(),
+        },
         body: JSON.stringify({
           scenario: {
             id: session.id,
             name: session.name,
             targetRegions: targetRegions.length > 0 ? targetRegions : undefined,
           },
-          iosImageUrl: ctx.iosImage?.url,
-          androidImageUrl: ctx.androidImage?.url,
-          designImageUrl: ctx.designImage?.url ?? ctx.designFigma?.imageUrl,
+          iosImageUrl: iosUrl,
+          androidImageUrl: androidUrl,
+          designImageUrl: designUrl,
+          designFigmaSpec: ctx.designImage?.figmaSpec ?? ctx.designFigma?.spec,
           iosDevice: session.iosDevice,
           androidDevice: session.androidDevice,
           options: session.options,
@@ -230,19 +246,32 @@ export default function WorkbenchMain({
 
     setBatchAuditing(true);
     setBatchProgress({ done: 0, total: targets.length, currentBoardName: targets[0].name });
+    const useReal = loadAIConfig().provider !== 'mock';
     try {
       for (let i = 0; i < targets.length; i++) {
         const b = targets[i];
         setBatchProgress({ done: i, total: targets.length, currentBoardName: b.name });
         try {
+          const [iosUrl, androidUrl, designUrl] = useReal
+            ? await Promise.all([
+                toCompressedDataUrl(b.iosImage?.url),
+                toCompressedDataUrl(b.androidImage?.url),
+                toCompressedDataUrl(b.designImage?.url ?? b.designFigma?.imageUrl),
+              ])
+            : [b.iosImage?.url, b.androidImage?.url, b.designImage?.url ?? b.designFigma?.imageUrl];
+
           const res = await fetch('/api/cross-platform-audit', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              ...buildAIHeaders(),
+            },
             body: JSON.stringify({
               scenario: { id: `${session.id}-${b.id}`, name: `${session.name} · ${b.name}` },
-              iosImageUrl: b.iosImage?.url,
-              androidImageUrl: b.androidImage?.url,
-              designImageUrl: b.designImage?.url ?? b.designFigma?.imageUrl,
+              iosImageUrl: iosUrl,
+              androidImageUrl: androidUrl,
+              designImageUrl: designUrl,
+              designFigmaSpec: b.designImage?.figmaSpec ?? b.designFigma?.spec,
               iosDevice: session.iosDevice,
               androidDevice: session.androidDevice,
               options: session.options,

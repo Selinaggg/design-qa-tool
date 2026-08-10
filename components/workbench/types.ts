@@ -47,6 +47,12 @@ export interface FigmaFrameRef {
   thumbnailUrl?: string;
   /** 拉取时间戳；用于判断 URL 是否需要刷新 */
   fetchedAt: number;
+  /**
+   * 精简设计 spec（色值/尺寸/字体/圆角/阴影）；来自 Figma nodes API。
+   * 存在时喂给 AI 作为"设计真相"，大幅提升色值/字号准确度。
+   * mock provider 或旧数据可能为空。
+   */
+  spec?: import('@/lib/figmaProviders/figmaSpecTypes').FigmaNodeSpec;
 }
 
 /**

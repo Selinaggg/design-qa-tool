@@ -586,11 +586,12 @@ function CompactDesignSlot({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
-      const { imageUrl, width, height, fileName } = data as {
+      const { imageUrl, width, height, fileName, spec } = data as {
         imageUrl: string;
         width: number;
         height: number;
         fileName: string;
+        spec?: import('@/lib/figmaProviders/figmaSpecTypes').FigmaNodeSpec;
       };
       onSet({
         file: new File([''], fileName || 'figma-frame.png', { type: 'image/png' }),
@@ -598,6 +599,7 @@ function CompactDesignSlot({
         width: width || 1440,
         height: height || 900,
         source: 'figma',
+        figmaSpec: spec,
       });
       setFigmaUrl('');
       setFigmaMode(false);
