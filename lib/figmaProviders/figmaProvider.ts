@@ -108,8 +108,9 @@ export class RealFigmaProvider implements FigmaProvider {
    * 只收 FRAME/COMPONENT/COMPONENT_SET（跳过 GROUP/RECTANGLE 之类，避免噪音）
    */
   async listFrames(req: ListFramesRequest): Promise<ListFramesResult> {
-    const { fileKey } = parseFigmaUrl(req.figmaUrl);
+    const { fileKey, nodeId } = parseFigmaUrl(req.figmaUrl);
     const scale = req.scale ?? 1;
+    const maxFrames = Math.min(Math.max(req.maxFrames ?? 20, 1), 200);
 
     // 1) 拉文件结构
     const fileRes = await fetch(
@@ -132,18 +133,35 @@ export class RealFigmaProvider implements FigmaProvider {
       document: FigmaNode;
     };
 
-    // 2) 遍历顶级 frames，按 page 分组
-    const frames: FigmaFrameSummary[] = [];
-    const canvases = fileData.document?.children ?? [];
+    // 2) 若 URL 带 node-id，定位其所在 CANVAS，只收该 page 的 frames；
+    //    否则遍历所有 CANVAS。
+    const allCanvases = (fileData.document?.children ?? []).filter(
+      (c) => c.type === 'CANVAS',
+    );
+    const targetCanvases = nodeId
+      ? allCanvases.filter((c) => canvasContainsNode(c, nodeId))
+      : allCanvases;
+
+    // 兜底：如果 node-id 定位失败（可能 URL 里的 node-id 不在文件里），
+    // 回退到全文件遍历，避免直接空结果让用户困惑
+    const canvasesToScan =
+      nodeId && targetCanvases.length === 0 ? allCanvases : targetCanvases;
+    const scopedByNodeId = nodeId ? targetCanvases.length > 0 : false;
+
+    // 3) 遍历顶级 frames，按 page 分组；空 name 回退到 pageName + nodeId 后缀
+    const allFrames: FigmaFrameSummary[] = [];
     const collectTypes = new Set(['FRAME', 'COMPONENT', 'COMPONENT_SET']);
-    for (const canvas of canvases) {
-      if (canvas.type !== 'CANVAS') continue;
+    for (const canvas of canvasesToScan) {
       const pageName = canvas.name;
       for (const child of canvas.children ?? []) {
         if (!collectTypes.has(child.type)) continue;
-        frames.push({
+        // 空 name（或纯空白）→ 用 pageName + nodeId 后 4 位兜底
+        const rawName = (child.name ?? '').trim();
+        const shortId = child.id.replace(':', '-');
+        const displayName = rawName || `${trimPageName(pageName)}/${shortId}`;
+        allFrames.push({
           nodeId: child.id,
-          name: child.name,
+          name: displayName,
           pageName,
           thumbnailUrl: '', // 下一步批量填
           width: Math.round(child.absoluteBoundingBox?.width ?? 0),
@@ -152,16 +170,24 @@ export class RealFigmaProvider implements FigmaProvider {
       }
     }
 
+    const totalCount = allFrames.length;
+    const truncated = totalCount > maxFrames;
+    // 截断到 maxFrames（保序，从头取）
+    const frames = truncated ? allFrames.slice(0, maxFrames) : allFrames;
+
     if (frames.length === 0) {
       return {
         fileKey,
         fileName: fileData.name ?? 'Untitled',
         frames: [],
         isMock: false,
+        totalCount,
+        truncated,
+        scopedByNodeId,
       };
     }
 
-    // 3) 批量拉缩略图（Figma 单次 /v1/images 支持逗号分隔多个 id，实测 100+ 也 OK）
+    // 4) 批量拉缩略图（Figma 单次 /v1/images 支持逗号分隔多个 id，实测 100+ 也 OK）
     // 大文件保险起见，分批（每批 100 个）
     const BATCH = 100;
     const thumbMap: Record<string, string> = {};
@@ -201,8 +227,41 @@ export class RealFigmaProvider implements FigmaProvider {
       fileName: fileData.name ?? 'Untitled',
       frames,
       isMock: false,
+      totalCount,
+      truncated,
+      scopedByNodeId,
     };
   }
+}
+
+/**
+ * 判断 canvas 子树中是否包含指定 nodeId
+ * （用于 node-id 定位 page）
+ */
+function canvasContainsNode(
+  canvas: { id: string; children?: Array<{ id: string; children?: unknown }> },
+  targetId: string,
+): boolean {
+  if (canvas.id === targetId) return true;
+  const stack: Array<{ id: string; children?: unknown }> = [...(canvas.children ?? [])];
+  while (stack.length > 0) {
+    const node = stack.pop()!;
+    if (node.id === targetId) return true;
+    const kids = (node as { children?: Array<{ id: string; children?: unknown }> }).children;
+    if (kids && Array.isArray(kids)) {
+      for (const k of kids) stack.push(k);
+    }
+  }
+  return false;
+}
+
+/**
+ * pageName 常含分隔符（如"——————预开播 最新设计稿—————"），
+ * 截取有意义的前几字用于空 frame 名兜底。
+ */
+function trimPageName(pageName: string): string {
+  const cleaned = pageName.replace(/[—─\-_=~*·]+/g, '').trim();
+  return cleaned.slice(0, 8) || 'page';
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

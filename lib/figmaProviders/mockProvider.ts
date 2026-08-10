@@ -25,9 +25,9 @@ export class MockFigmaProvider implements FigmaProvider {
    * 返回一批假 frames，用于开发 UI 时不依赖真实 API。
    * 命名有意贴合常见截图名（home / detail / cart …），配合 fuzzy 匹配演示效果
    */
-  async listFrames(_req: ListFramesRequest): Promise<ListFramesResult> {
+  async listFrames(req: ListFramesRequest): Promise<ListFramesResult> {
     await new Promise((r) => setTimeout(r, 600));
-    const frames: FigmaFrameSummary[] = [
+    const allFrames: FigmaFrameSummary[] = [
       { nodeId: '1:2', name: 'Home', pageName: '主流程', thumbnailUrl: '/fixtures/mock-design.svg', width: 375, height: 812 },
       { nodeId: '1:3', name: 'Search', pageName: '主流程', thumbnailUrl: '/fixtures/mock-design.svg', width: 375, height: 812 },
       { nodeId: '1:4', name: 'Product Detail', pageName: '主流程', thumbnailUrl: '/fixtures/mock-design.svg', width: 375, height: 812 },
@@ -37,11 +37,18 @@ export class MockFigmaProvider implements FigmaProvider {
       { nodeId: '1:8', name: 'Profile', pageName: '个人中心', thumbnailUrl: '/fixtures/mock-design.svg', width: 375, height: 812 },
       { nodeId: '1:9', name: 'Settings', pageName: '个人中心', thumbnailUrl: '/fixtures/mock-design.svg', width: 375, height: 812 },
     ];
+    const maxFrames = Math.min(Math.max(req.maxFrames ?? 20, 1), 200);
+    const totalCount = allFrames.length;
+    const truncated = totalCount > maxFrames;
+    const frames = truncated ? allFrames.slice(0, maxFrames) : allFrames;
     return {
       fileKey: 'MOCK_FILE_KEY',
       fileName: 'Mock Design Library',
       frames,
       isMock: true,
+      totalCount,
+      truncated,
+      scopedByNodeId: false,
     };
   }
 }

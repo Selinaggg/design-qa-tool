@@ -43,6 +43,7 @@ export default function BoardMappingTable({
   const [showPool, setShowPool] = useState(false); // 面板折叠
   const [poolSearch, setPoolSearch] = useState('');
   const [autoMatchStats, setAutoMatchStats] = useState<{ hit: number; total: number } | null>(null);
+  const [poolMeta, setPoolMeta] = useState<{ totalCount: number; truncated: boolean; scopedByNodeId: boolean } | null>(null);
 
   // 加载 Figma 文件
   const handleLoadFrames = useCallback(async () => {
@@ -57,7 +58,7 @@ export default function BoardMappingTable({
       const res = await fetch('/api/figma-file-frames', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ figmaUrl: trimmed }),
+        body: JSON.stringify({ figmaUrl: trimmed, maxFrames: 20 }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
@@ -65,10 +66,16 @@ export default function BoardMappingTable({
       if (frames.length === 0) {
         setFramesError('该文件下未发现任何 frame');
         setFramePool(null);
+        setPoolMeta(null);
         return;
       }
       setFramePool(frames);
       setFileName(data.fileName ?? '');
+      setPoolMeta({
+        totalCount: typeof data.totalCount === 'number' ? data.totalCount : frames.length,
+        truncated: Boolean(data.truncated),
+        scopedByNodeId: Boolean(data.scopedByNodeId),
+      });
       setShowPool(true);
 
       // 自动匹配 —— 遍历 boards，fuzzy match
@@ -97,6 +104,7 @@ export default function BoardMappingTable({
     } catch (err) {
       setFramesError(err instanceof Error ? err.message : 'Figma 文件加载失败');
       setFramePool(null);
+      setPoolMeta(null);
     } finally {
       setLoadingFrames(false);
     }
@@ -189,9 +197,18 @@ export default function BoardMappingTable({
         )}
 
         {framePool && autoMatchStats && (
-          <div className="px-3 pb-2 flex items-center gap-2 text-[11px]">
+          <div className="px-3 pb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
             <span className="text-slate-600">
-              <span className="font-semibold text-slate-800">{fileName}</span> · {framePool.length} 个画板已加载
+              <span className="font-semibold text-slate-800">{fileName}</span>
+              {poolMeta?.scopedByNodeId && framePool[0]?.pageName && (
+                <>
+                  {' '}·{' '}
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-50 text-purple-600 border border-purple-100 text-[10px]">
+                    📄 {framePool[0].pageName.length > 20 ? framePool[0].pageName.slice(0, 20) + '…' : framePool[0].pageName}
+                  </span>
+                </>
+              )}
+              {' '}· {framePool.length} 个画板已加载
             </span>
             <span className="text-slate-300">·</span>
             <span className={autoMatchStats.hit > 0 ? 'text-emerald-600 font-medium' : 'text-slate-400'}>
@@ -200,6 +217,11 @@ export default function BoardMappingTable({
             {autoMatchStats.hit < autoMatchStats.total && (
               <span className="text-slate-400">
                 · 未命中的可从下方画板池手动分派
+              </span>
+            )}
+            {poolMeta?.truncated && (
+              <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-700 text-[10px]">
+                ⚠ {poolMeta.scopedByNodeId ? '该 page' : '该文件'} 有 {poolMeta.totalCount} 个画板，仅取前 {framePool.length}
               </span>
             )}
           </div>

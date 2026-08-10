@@ -28,6 +28,8 @@ export interface ListFramesRequest {
   figmaUrl: string;
   /** 缩略图 scale，默认 1（省流量） */
   scale?: number;
+  /** 最多返回多少个 frame，默认 20，硬上限 200 防炸 */
+  maxFrames?: number;
 }
 
 export interface ListFramesResult {
@@ -35,6 +37,12 @@ export interface ListFramesResult {
   fileName: string;
   frames: FigmaFrameSummary[];
   isMock: boolean;
+  /** 文件实际 frame 总数（截断前），truncated=true 时 UI 可提示 */
+  totalCount: number;
+  /** 是否因超过 maxFrames 被截断 */
+  truncated: boolean;
+  /** URL 是否带 node-id 且成功定位到某 page（true=只拉了该 page） */
+  scopedByNodeId: boolean;
 }
 
 export interface FigmaProvider {
