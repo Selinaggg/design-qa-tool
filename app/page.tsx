@@ -24,9 +24,10 @@ import {
   setActiveBoardId,
   setIssueLink,
   switchVersion,
+  updateBoardInCurrentVersion,
   updateCurrentVersion,
 } from '@/lib/sessionHelpers';
-import type { AuditSession, AuditVersion } from '@/components/workbench/types';
+import type { AuditSession, AuditVersion, Board } from '@/components/workbench/types';
 import type { ImageFile } from '@/types';
 import type { NormalizedRect, PlatformConsistencyIssue } from '@/lib/crossPlatform';
 
@@ -261,6 +262,19 @@ export default function Home() {
     [activeSessionId],
   );
 
+  // P4.1：批量走查时更新指定 board 的字段（写 crossPlatformResult 用）
+  const handleUpdateBoard = useCallback(
+    (boardId: string, patch: Partial<Board>) => {
+      if (!activeSessionId) return;
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === activeSessionId ? updateBoardInCurrentVersion(s, boardId, patch) : s,
+        ),
+      );
+    },
+    [activeSessionId],
+  );
+
   // ─── IssuesSidebar 回调 ─────────────────────────────────
   const handleUpdateIssueStatus = useCallback(
     (id: string, status: string) => {
@@ -372,6 +386,7 @@ export default function Home() {
           onSetActiveBoard={handleSetActiveBoard}
           onUpdateSession={handleUpdateSession}
           onUpdateVersion={handleUpdateVersion}
+          onUpdateBoard={handleUpdateBoard}
           highlightedRegionName={highlightedRegionName}
           highlightedIssueId={highlightedIssueId}
           onHighlightIssue={setHighlightedIssueId}

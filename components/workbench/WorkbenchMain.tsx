@@ -10,7 +10,7 @@ import BoardTabs from './BoardTabs';
 import InsightsBar, { ExportDropdown } from './InsightsBar';
 import VersionDiffDialog from './VersionDiffDialog';
 import { toneFromSeverity, type BadgeItem } from '@/components/comparison/IssueBadgeOverlay';
-import type { AuditSession, AuditVersion } from './types';
+import type { AuditSession, AuditVersion, Board } from './types';
 import { MAX_VERSIONS } from './types';
 import { getCurrentVersion, canAddVersion, getActiveContext } from '@/lib/sessionHelpers';
 import type {
@@ -63,6 +63,8 @@ interface WorkbenchMainProps {
   onSetActiveBoard?: (boardId: string) => void;
   onUpdateSession: (patch: Partial<AuditSession>) => void;
   onUpdateVersion: (patch: Partial<AuditVersion>) => void;
+  /** P4.1：批量走查时更新指定 board 的字段（写回 crossPlatformResult） */
+  onUpdateBoard?: (boardId: string, patch: Partial<Board>) => void;
   highlightedRegionName?: string | null;
   highlightedIssueId?: string | null;
   onHighlightIssue?: (id: string | null) => void;
@@ -91,6 +93,7 @@ export default function WorkbenchMain({
   onSetActiveBoard,
   onUpdateSession,
   onUpdateVersion,
+  onUpdateBoard,
   highlightedRegionName,
   highlightedIssueId,
   onHighlightIssue,
@@ -100,6 +103,12 @@ export default function WorkbenchMain({
   onStartManual,
 }: WorkbenchMainProps) {
   const [auditing, setAuditing] = useState(false);
+  // P4.1：批量执行进度 { done, total, currentBoardName }；null = 空闲
+  const [batchProgress, setBatchProgress] = useState<{
+    done: number;
+    total: number;
+    currentBoardName: string;
+  } | null>(null);
 
   // ── 视图控制状态（上移到此层，供 ToolBar 和 CrossPlatformWorkbench 共用） ──
   const [viewMode, setViewMode] = useState<ViewMode>('compare');
@@ -164,13 +173,95 @@ export default function WorkbenchMain({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
-      onUpdateVersion({ crossPlatformResult: data as CrossPlatformAuditResult });
+      // P4.1 修复：batch 会话写到 active board，单画板才写到 version 顶层
+      if (ctx.activeBoard && onUpdateBoard) {
+        onUpdateBoard(ctx.activeBoard.id, {
+          crossPlatformResult: data as CrossPlatformAuditResult,
+        });
+      } else {
+        onUpdateVersion({ crossPlatformResult: data as CrossPlatformAuditResult });
+      }
     } catch (err) {
       alert(err instanceof Error ? err.message : '走查失败');
     } finally {
       setAuditing(false);
     }
-  }, [session, onUpdateVersion]);
+  }, [session, onUpdateVersion, onUpdateBoard]);
+
+  // P4.1：批量执行 —— 循环全部 boards 调 API，串行执行避免撞速率限制
+  const handleBatchAudit = useCallback(async () => {
+    if (!session || !onUpdateBoard) return;
+    const ctx = getActiveContext(session);
+    const boards = ctx?.boards;
+    if (!boards || boards.length === 0) return;
+
+    // 过滤出"可走查"的 board（至少一端；单端必须有设计稿）
+    const runnable = boards.filter((b) => {
+      const hasIos = !!b.iosImage;
+      const hasAndroid = !!b.androidImage;
+      const hasDesign = !!b.designImage || !!b.designFigma;
+      if (!hasIos && !hasAndroid) return false;
+      if ((!hasIos || !hasAndroid) && !hasDesign) return false;
+      if (hasIos && !session.iosDevice) return false;
+      if (hasAndroid && !session.androidDevice) return false;
+      return true;
+    });
+
+    if (runnable.length === 0) {
+      alert('没有可走查的画板：请检查每个画板是否至少有一端截图，单端画板需搭配设计稿');
+      return;
+    }
+
+    // 已有结果的 board 跳过 / 提示确认覆盖
+    const alreadyRun = runnable.filter((b) => !!b.crossPlatformResult);
+    let overwrite = false;
+    if (alreadyRun.length > 0) {
+      overwrite = confirm(
+        `已有 ${alreadyRun.length} 个画板走查过。\n\n[确定]：重跑全部（覆盖旧结果）\n[取消]：只跑未走查的 ${runnable.length - alreadyRun.length} 个`,
+      );
+    }
+    const targets = overwrite ? runnable : runnable.filter((b) => !b.crossPlatformResult);
+    if (targets.length === 0) return;
+
+    setAuditing(true);
+    setBatchProgress({ done: 0, total: targets.length, currentBoardName: targets[0].name });
+    try {
+      for (let i = 0; i < targets.length; i++) {
+        const b = targets[i];
+        setBatchProgress({ done: i, total: targets.length, currentBoardName: b.name });
+        try {
+          const res = await fetch('/api/cross-platform-audit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              scenario: { id: `${session.id}-${b.id}`, name: `${session.name} · ${b.name}` },
+              iosImageUrl: b.iosImage?.url,
+              androidImageUrl: b.androidImage?.url,
+              designImageUrl: b.designImage?.url ?? b.designFigma?.imageUrl,
+              iosDevice: session.iosDevice,
+              androidDevice: session.androidDevice,
+              options: session.options,
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+          onUpdateBoard(b.id, { crossPlatformResult: data as CrossPlatformAuditResult });
+        } catch (err) {
+          // 单板失败不阻塞其他板；控制台记录
+          console.error(`[batch audit] board "${b.name}" failed:`, err);
+        }
+      }
+      setBatchProgress({
+        done: targets.length,
+        total: targets.length,
+        currentBoardName: '',
+      });
+    } finally {
+      setAuditing(false);
+      // 短暂延迟后清进度条（让用户看到 100%）
+      setTimeout(() => setBatchProgress(null), 1500);
+    }
+  }, [session, onUpdateBoard]);
 
   if (!session) {
     return <EmptyWorkbench onNewAudit={onNewAudit} />;
@@ -206,6 +297,16 @@ export default function WorkbenchMain({
       {/* BoardTabs：批量走查画板切换（P2.7）—— 仅 batch 会话且 boards>0 时渲染 */}
       {session && session.type === 'batch' && onSetActiveBoard && (
         <BoardTabs session={session} onSetActiveBoard={onSetActiveBoard} />
+      )}
+
+      {/* P4.1：批量走查专属 —— 批量执行按钮 + 进度条 */}
+      {session && session.type === 'batch' && onUpdateBoard && (
+        <BatchAuditBar
+          session={session}
+          auditing={auditing}
+          progress={batchProgress}
+          onRunBatch={handleBatchAudit}
+        />
       )}
 
       {/* ToolBar：工具条（替换 InsightsBar） */}
@@ -1211,5 +1312,131 @@ function EmptyWorkbench({ onNewAudit }: { onNewAudit: () => void }) {
         </button>
       </div>
     </main>
+  );
+}
+
+// ─── P4.1：批量执行工具条（batch 会话专属，位于 BoardTabs 下方） ────────────
+function BatchAuditBar({
+  session,
+  auditing,
+  progress,
+  onRunBatch,
+}: {
+  session: AuditSession;
+  auditing: boolean;
+  progress: { done: number; total: number; currentBoardName: string } | null;
+  onRunBatch: () => void;
+}) {
+  const ctx = getActiveContext(session);
+  const boards = ctx?.boards ?? [];
+  if (boards.length === 0) return null;
+
+  const runnable = boards.filter((b) => {
+    const hasIos = !!b.iosImage;
+    const hasAndroid = !!b.androidImage;
+    const hasDesign = !!b.designImage || !!b.designFigma;
+    if (!hasIos && !hasAndroid) return false;
+    if ((!hasIos || !hasAndroid) && !hasDesign) return false;
+    if (hasIos && !session.iosDevice) return false;
+    if (hasAndroid && !session.androidDevice) return false;
+    return true;
+  });
+  const alreadyRun = boards.filter((b) => !!b.crossPlatformResult).length;
+  const pending = runnable.filter((b) => !b.crossPlatformResult).length;
+  const canRun = runnable.length > 0 && !auditing;
+
+  // P4.2：调用次数预估（增量执行下 = pending；全量重跑 = runnable.length）
+  const estimatedCalls = pending; // 默认按增量算，用户确认覆盖时再全跑
+  const buttonLabel =
+    alreadyRun === 0
+      ? `批量执行走查（${runnable.length}）`
+      : pending > 0
+        ? `增量执行（${pending} 个待走查）`
+        : `重新执行（${runnable.length} 个）`;
+
+  return (
+    <div className="flex items-center gap-3 px-6 py-2 border-b border-slate-200 bg-blue-50/40 flex-shrink-0">
+      <button
+        type="button"
+        onClick={onRunBatch}
+        disabled={!canRun}
+        title={
+          canRun
+            ? `本次预计消耗 ${estimatedCalls} 次 API 调用（每画板一次）`
+            : '没有可走查的画板'
+        }
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
+      >
+        {auditing ? (
+          <>
+            <svg
+              className="w-3 h-3 animate-spin"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <circle cx="12" cy="12" r="10" strokeWidth="4" className="opacity-25" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={4}
+                d="M4 12a8 8 0 018-8"
+              />
+            </svg>
+            走查中…
+          </>
+        ) : (
+          <>
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 3l14 9-14 9V3z"
+              />
+            </svg>
+            {buttonLabel}
+          </>
+        )}
+      </button>
+
+      {progress ? (
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="flex-1 h-1.5 rounded-full bg-slate-200 overflow-hidden max-w-xs">
+            <div
+              className="h-full bg-blue-500 transition-all duration-300"
+              style={{
+                width: `${progress.total > 0 ? (progress.done / progress.total) * 100 : 0}%`,
+              }}
+            />
+          </div>
+          <span className="text-[11px] text-slate-600 font-medium whitespace-nowrap">
+            {progress.done} / {progress.total}
+            {progress.currentBoardName && (
+              <span className="ml-2 text-slate-400 truncate">
+                当前：{progress.currentBoardName}
+              </span>
+            )}
+          </span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-3 text-[11px] text-slate-500">
+          <span>
+            共 <span className="font-semibold text-slate-700">{boards.length}</span> 个画板
+          </span>
+          {runnable.length < boards.length && (
+            <span className="text-amber-600">
+              {boards.length - runnable.length} 个不可走查（缺截图/设计稿/设备）
+            </span>
+          )}
+          <span className="text-slate-300">·</span>
+          <span>
+            已走查{' '}
+            <span className="font-semibold text-emerald-600">{alreadyRun}</span> · 待走查{' '}
+            <span className="font-semibold text-blue-600">{pending}</span>
+          </span>
+        </div>
+      )}
+    </div>
   );
 }

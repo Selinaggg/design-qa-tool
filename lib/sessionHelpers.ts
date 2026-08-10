@@ -90,6 +90,92 @@ export function updateCurrentVersion(
 }
 
 /**
+ * P4.3：批量走查追加新版本
+ *  - 输入：session（batch 类型）+ 新一批 boards（buildBoardsFromGroups 生成，name 已作 key）
+ *  - 匹配：按 board.name 与上一版对齐
+ *    · 上版有、新版有 → 继承 id / designImage / designFigma / firstAppearedVersion；替换截图；清 result
+ *    · 上版有、新版无 → 保留在新版本中但打 removedInVersion，冻结旧结果
+ *    · 上版无、新版有 → firstAppearedVersion = newV
+ *  - 达到 MAX_VERSIONS 上限 → 返回 null
+ *
+ * 注意：本 helper P4 阶段暂无 UI 触发；先建能力，为后续"batch 新版本上传"入口铺路
+ */
+export function addBatchVersion(
+  session: AuditSession,
+  newBoards: Board[],
+  label?: string,
+): AuditSession | null {
+  if (!canAddVersion(session)) return null;
+  if (!isBatchSession(session)) return null;
+  if (newBoards.length === 0) return null;
+
+  const last = session.versions[session.versions.length - 1];
+  const prevBoards = last.boards ?? [];
+  const newV = last.v + 1;
+
+  // 建立新版索引：name → newBoard
+  const newByName = new Map<string, Board>();
+  for (const nb of newBoards) newByName.set(nb.name, nb);
+
+  const mergedBoards: Board[] = [];
+
+  // 1) 遍历上一版：命中的替换/未命中的标 removed
+  for (const pb of prevBoards) {
+    const match = newByName.get(pb.name);
+    if (match) {
+      // 命中：继承 id + designImage/designFigma + firstAppearedVersion；采用新截图；清 result
+      mergedBoards.push({
+        ...match,
+        id: pb.id, // 保 id 稳定，跨版本对比可对齐
+        designImage: match.designImage ?? pb.designImage,
+        designFigma: match.designFigma ?? pb.designFigma,
+        firstAppearedVersion: pb.firstAppearedVersion,
+        removedInVersion: undefined, // 之前被移除又回来，清除标记
+        crossPlatformResult: null,
+      });
+      newByName.delete(pb.name);
+    } else {
+      // 未命中：保留在新版本，但标 removedInVersion；冻结旧结果
+      mergedBoards.push({
+        ...pb,
+        removedInVersion: pb.removedInVersion ?? newV,
+      });
+    }
+  }
+
+  // 2) newByName 剩下的 = 新增 board（上一版没有）
+  for (const nb of newByName.values()) {
+    mergedBoards.push({
+      ...nb,
+      firstAppearedVersion: newV,
+    });
+  }
+
+  const newVersion: AuditVersion = {
+    v: newV,
+    label,
+    createdAt: Date.now(),
+    boards: mergedBoards,
+    activeBoardId: mergedBoards[0]?.id,
+    // 单画板字段保持 null（batch 不用）
+    iosImage: null,
+    androidImage: null,
+    designRefImage: null,
+    iosRegions: [],
+    androidRegions: [],
+    crossPlatformResult: null,
+    issueLinks: {},
+  };
+
+  const newVersions = [...session.versions, newVersion];
+  return {
+    ...session,
+    versions: newVersions,
+    currentVersionIndex: newVersions.length - 1,
+  };
+}
+
+/**
  * 向当前版本的 issues 中添加一条手工标注的问题
  * 返回修改后的 session（未修改原对象）
  */

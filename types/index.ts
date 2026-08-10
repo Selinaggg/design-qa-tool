@@ -3,6 +3,12 @@ export interface ImageFile {
   url: string;
   width: number;
   height: number;
+  /**
+   * 图片来源（可选；默认视为 'upload'）
+   * - 'upload'：用户本地上传
+   * - 'figma'：通过 /api/figma-export 从 Figma 拉取；未来 P4 可据此实现"刷新"能力
+   */
+  source?: 'upload' | 'figma';
 }
 
 export type ComparisonMode = 'side-by-side' | 'slider' | 'diff';

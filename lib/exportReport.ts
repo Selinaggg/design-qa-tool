@@ -7,7 +7,7 @@
 
 import type { AuditSession } from '@/components/workbench/types';
 import type { NormalizedRect } from '@/lib/crossPlatform/types';
-import { getCurrentVersion, getActiveContext, type VersionDiff } from '@/lib/sessionHelpers';
+import { getCurrentVersion, getActiveContext, isBatchSession, type VersionDiff } from '@/lib/sessionHelpers';
 
 // ── 下载辅助 ─────────────────────────────────────────────────────────────
 
@@ -399,18 +399,192 @@ function safeFilename(name: string): string {
   return name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5_-]/g, '_').slice(0, 40);
 }
 
+/**
+ * P4.4：批量走查分章节 Markdown
+ *  - 顶部：会话摘要（画板数、已走查/未走查、聚合评分）
+ *  - 章节：每个 board 一节（借调 buildMarkdown，临时切 activeBoardId）
+ *  - 未走查的 board 单列一节，标"未走查"
+ */
+export function buildBatchMarkdown(session: AuditSession): string {
+  const cur = getCurrentVersion(session);
+  const boards = cur.boards ?? [];
+  if (boards.length === 0) return '';
+
+  const date = new Date(cur.createdAt).toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  const auditedBoards = boards.filter((b) => !!b.crossPlatformResult);
+  const pendingBoards = boards.filter((b) => !b.crossPlatformResult);
+
+  // 聚合评分（简单平均）
+  const avg = (nums: number[]) =>
+    nums.length === 0 ? 0 : Math.round(nums.reduce((a, b) => a + b, 0) / nums.length);
+  const overallAvg = avg(auditedBoards.map((b) => b.crossPlatformResult!.overallScore));
+  const consistencyAvg = avg(
+    auditedBoards.map((b) => b.crossPlatformResult!.platformConsistencyScore),
+  );
+
+  // 聚合问题分布
+  const agg = { critical: 0, high: 0, medium: 0, low: 0 };
+  for (const b of auditedBoards) {
+    const s = b.crossPlatformResult!.summary;
+    agg.critical += s.critical;
+    agg.high += s.high;
+    agg.medium += s.medium;
+    agg.low += s.low;
+  }
+  const totalIssues = agg.critical + agg.high + agg.medium + agg.low;
+
+  const lines: string[] = [];
+  lines.push(`# 批量跨端走查报告：${session.name}（v${cur.v}）`);
+  lines.push('');
+  lines.push(`> 版本：v${cur.v}${cur.label ? ` · ${cur.label}` : ''}  `);
+  lines.push(`> 生成时间：${date}  `);
+  lines.push(`> iOS 设备：${session.iosDevice?.name ?? '未设置'}  `);
+  lines.push(`> Android 设备：${session.androidDevice?.name ?? '未设置'}  `);
+  lines.push('');
+
+  lines.push('## 会话摘要');
+  lines.push('');
+  lines.push('| 指标 | 值 |');
+  lines.push('|------|-----|');
+  lines.push(`| 画板总数 | ${boards.length} |`);
+  lines.push(`| 已走查 | ${auditedBoards.length} |`);
+  lines.push(`| 未走查 | ${pendingBoards.length} |`);
+  if (auditedBoards.length > 0) {
+    lines.push(`| 综合评分（均值） | ${overallAvg} · ${gradeLabel(overallAvg)} |`);
+    lines.push(`| 跨端一致性（均值） | ${consistencyAvg} · ${gradeLabel(consistencyAvg)} |`);
+    lines.push(`| 问题总数 | ${totalIssues} |`);
+  }
+  lines.push('');
+
+  if (auditedBoards.length > 0 && totalIssues > 0) {
+    lines.push('### 问题分布（聚合）');
+    lines.push('');
+    if (agg.critical > 0) lines.push(`- 🔴 严重：${agg.critical} 项`);
+    if (agg.high > 0) lines.push(`- 🟠 高：${agg.high} 项`);
+    if (agg.medium > 0) lines.push(`- 🟡 中：${agg.medium} 项`);
+    if (agg.low > 0) lines.push(`- 🟢 低：${agg.low} 项`);
+    lines.push('');
+  }
+
+  // ── 目录 ──
+  lines.push('## 目录');
+  lines.push('');
+  boards.forEach((b, i) => {
+    const audited = !!b.crossPlatformResult;
+    const scoreLabel = audited
+      ? ` · ${b.crossPlatformResult!.overallScore} 分`
+      : '（未走查）';
+    lines.push(`${i + 1}. ${b.name}${scoreLabel}`);
+  });
+  lines.push('');
+
+  // ── 每个 board 一章节 ──
+  boards.forEach((b, i) => {
+    lines.push('---');
+    lines.push('');
+    lines.push(`# 第 ${i + 1} 章 · ${b.name}`);
+    lines.push('');
+
+    if (!b.crossPlatformResult) {
+      lines.push('> ⚠️ 该画板尚未执行走查');
+      lines.push('');
+      const parts: string[] = [];
+      if (b.iosImage) parts.push('iOS 截图 ✓');
+      if (b.androidImage) parts.push('Android 截图 ✓');
+      if (b.designImage || b.designFigma) parts.push('设计稿 ✓');
+      lines.push(`资源：${parts.join(' · ') || '无'}`);
+      lines.push('');
+      return;
+    }
+
+    // 临时切 activeBoardId，复用 buildMarkdown，把结果去掉一级标题后接入
+    const tempSession: AuditSession = {
+      ...session,
+      versions: session.versions.map((v, vi) =>
+        vi === session.currentVersionIndex ? { ...v, activeBoardId: b.id } : v,
+      ),
+    };
+    const boardMd = buildMarkdown(tempSession);
+    // 去掉第一个 "# ..." 标题行以及紧随其后的 blockquote 引用块
+    // 保留 "## 评分概览" 及以下所有内容
+    const idx = boardMd.indexOf('## 评分概览');
+    if (idx > 0) {
+      lines.push(boardMd.slice(idx));
+    } else {
+      lines.push(boardMd);
+    }
+    lines.push('');
+  });
+
+  lines.push('---');
+  lines.push('');
+  lines.push(`*报告由 Design QA Tool 自动生成，生成于 ${date}*`);
+  lines.push('');
+
+  return lines.join('\n');
+}
+
 export function exportMarkdown(session: AuditSession) {
   const cur = getCurrentVersion(session);
-  const content = buildMarkdown(session);
-  const filename = `走查报告_${safeFilename(session.name)}_v${cur.v}_${formatDate(cur.createdAt)}.md`;
+  const content = isBatchSession(session)
+    ? buildBatchMarkdown(session)
+    : buildMarkdown(session);
+  const prefix = isBatchSession(session) ? '批量走查报告' : '走查报告';
+  const filename = `${prefix}_${safeFilename(session.name)}_v${cur.v}_${formatDate(cur.createdAt)}.md`;
   downloadBlob(content, filename, 'text/markdown;charset=utf-8');
 }
 
 export function exportJSON(session: AuditSession) {
   const cur = getCurrentVersion(session);
-  const data = buildJSON(session);
-  const content = JSON.stringify(data, null, 2);
-  const filename = `走查报告_${safeFilename(session.name)}_v${cur.v}_${formatDate(cur.createdAt)}.json`;
+  let content: string;
+  let prefix: string;
+  if (isBatchSession(session)) {
+    // P4.4：batch 会话导出 boards 数组
+    const boards = cur.boards ?? [];
+    const payload = {
+      meta: {
+        tool: 'Design QA Tool',
+        version: 'v1',
+        exportedAt: new Date().toISOString(),
+        sessionId: session.id,
+        sessionName: session.name,
+        createdAt: new Date(cur.createdAt).toISOString(),
+        type: 'batch',
+        boardCount: boards.length,
+        auditedCount: boards.filter((b) => !!b.crossPlatformResult).length,
+      },
+      devices: {
+        ios: session.iosDevice?.name ?? '',
+        android: session.androidDevice?.name ?? '',
+      },
+      boards: boards.map((b) => ({
+        id: b.id,
+        name: b.name,
+        platformMode: b.platformMode,
+        firstAppearedVersion: b.firstAppearedVersion,
+        removedInVersion: b.removedInVersion,
+        hasIos: !!b.iosImage,
+        hasAndroid: !!b.androidImage,
+        hasDesign: !!b.designImage || !!b.designFigma,
+        designSource: b.designFigma ? 'figma' : b.designImage ? 'upload' : null,
+        audited: !!b.crossPlatformResult,
+        result: b.crossPlatformResult ?? null,
+      })),
+    };
+    content = JSON.stringify(payload, null, 2);
+    prefix = '批量走查报告';
+  } else {
+    content = JSON.stringify(buildJSON(session), null, 2);
+    prefix = '走查报告';
+  }
+  const filename = `${prefix}_${safeFilename(session.name)}_v${cur.v}_${formatDate(cur.createdAt)}.json`;
   downloadBlob(content, filename, 'application/json;charset=utf-8');
 }
 
