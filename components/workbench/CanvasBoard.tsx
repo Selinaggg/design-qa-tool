@@ -257,7 +257,8 @@ export default forwardRef<CanvasBoardHandle, CanvasBoardProps>(function CanvasBo
     setScale(clampScale(+s.toFixed(3)));
   }, [scrollSize, contentNatural, maxScale, clampScale]);
 
-  // ── 自动首次适应：内容和容器都测好后，若用户还没手动缩放，则自动 fit ──
+  // ── 自动首次适应：内容和容器都测好后，只 fit 一次；之后 scrollSize 变化不再触发
+  //    （避免滚动条 hover 出现/消失导致的宽度抖动引发 auto-fit 循环）──
   useEffect(() => {
     if (userAdjustedRef.current) return;
     if (contentNatural.w === 0 || contentNatural.h === 0) return;
@@ -267,6 +268,9 @@ export default forwardRef<CanvasBoardHandle, CanvasBoardProps>(function CanvasBo
     if (availW <= 0 || availH <= 0) return;
     const s = Math.min(availW / contentNatural.w, availH / contentNatural.h, maxScale, 1);
     setScale(clampScale(+s.toFixed(3)));
+    // 首次 fit 完成后，标记为"已调整"，避免后续 scrollSize/contentNatural 波动再触发
+    // 用户仍可点右下角"适应"按钮手动重 fit
+    userAdjustedRef.current = true;
   }, [contentNatural, scrollSize, maxScale, clampScale]);
 
   // 手动适应按钮：算入用户操作
