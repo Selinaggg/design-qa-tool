@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, forwardRef } from 'react';
+import { Collapse } from '@/components/ui/Collapse';
 import type {
   PlatformConsistencyIssue,
   IssueType,
@@ -119,7 +120,7 @@ const ConsistencyIssueCard = forwardRef<HTMLDivElement, ConsistencyIssueCardProp
       ref={ref}
       className={`border rounded-xl overflow-hidden bg-white transition-all ${
         isHighlighted
-          ? 'border-blue-400 ring-2 ring-blue-100 shadow-md'
+          ? 'border-blue-400 ring-2 ring-blue-100 shadow-float'
           : issue.isAcceptablePlatformDifference
             ? 'border-slate-200 opacity-80'
             : 'border-slate-200'
@@ -196,7 +197,7 @@ const ConsistencyIssueCard = forwardRef<HTMLDivElement, ConsistencyIssueCardProp
         )}
       </button>
 
-      {expanded && (
+      <Collapse open={expanded}>
         <div className="border-t border-slate-100 px-3 pb-3 pt-2 flex flex-col gap-1.5">
           {issue.regionName && (
             <p className="text-[11px] text-slate-400">
@@ -303,7 +304,7 @@ const ConsistencyIssueCard = forwardRef<HTMLDivElement, ConsistencyIssueCardProp
             </div>
           )}
         </div>
-      )}
+      </Collapse>
     </div>
   );
 });

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { AnimatePresence, motion } from 'motion/react';
 import PlatformComparison from '@/components/cross-platform/PlatformComparison';
 import AnnotationStep from '@/components/cross-platform/AnnotationStep';
 import SliderView from '@/components/comparison/SliderView';
@@ -313,8 +314,8 @@ export default function WorkbenchMain({
 
   return (
     <main className="flex-1 min-w-0 flex flex-col bg-slate-50 overflow-hidden">
-      {/* Session header */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-slate-200 bg-white flex-shrink-0">
+      {/* Session header —— 半透明 chrome，内容从下方穿过（Apple §12） */}
+      <div className="flex items-center justify-between px-6 py-3 border-b border-slate-200/60 material-thick flex-shrink-0">
         <div className="flex items-center gap-3 min-w-0">
           <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-purple-100 text-purple-700">
             跨端走查
@@ -792,7 +793,7 @@ function WorkbenchToolBar({
     }`;
 
   return (
-    <div className="relative z-50 flex items-center gap-1 px-3 py-1.5 border-b border-slate-200 bg-white flex-shrink-0 min-w-0">
+    <div className="relative z-50 flex items-center gap-1 px-3 py-1.5 border-b border-slate-200/60 material-regular flex-shrink-0 min-w-0">
       {/* ── 版本组 ── */}
       <VersionSwitcher
         session={session}
@@ -1067,43 +1068,51 @@ function VersionSwitcher({
       </TBTooltip>
 
       {/* 下拉列表：Portal 到 body，彻底避免 overflow/transform/backdrop-filter 干扰 */}
-      {open && typeof document !== 'undefined' && createPortal(
-        <>
-          <div className="fixed inset-0 z-[99]" onClick={() => setOpen(false)} />
-          <div
-            className="fixed min-w-[200px] rounded-lg border border-slate-200 bg-white shadow-xl z-[100] py-1"
-            style={{ top: dropdownPos.top, left: dropdownPos.left }}
-          >
-            {session.versions.map((v, i) => {
-              const isCurrent = i === session.currentVersionIndex;
-              return (
-                <button
-                  key={v.v}
-                  type="button"
-                  onClick={() => { onSwitch(i); setOpen(false); }}
-                  className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${
-                    isCurrent ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-700'
-                  }`}
-                >
-                  <span className={`inline-flex items-center justify-center w-6 h-6 rounded text-[10px] font-bold ${
-                    isCurrent ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'
-                  }`}>
-                    v{v.v}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium">
-                      {v.label ?? (i === 0 ? '初始版本' : `第 ${v.v} 版`)}
-                      {isCurrent && <span className="ml-1 text-[10px] text-blue-500">· 当前</span>}
-                    </div>
-                    <div className="text-[10px] text-slate-400">
-                      {new Date(v.createdAt).toLocaleString()}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </>,
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {open && (
+            <>
+              <div className="fixed inset-0 z-[99] no-press" onClick={() => setOpen(false)} />
+              <motion.div
+                className="fixed min-w-[200px] rounded-lg border border-slate-200/60 material-thin shadow-float z-[100] py-1"
+                style={{ top: dropdownPos.top, left: dropdownPos.left, transformOrigin: 'top left' }}
+                initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                transition={{ type: 'spring', bounce: 0, duration: 0.25 }}
+              >
+                {session.versions.map((v, i) => {
+                  const isCurrent = i === session.currentVersionIndex;
+                  return (
+                    <button
+                      key={v.v}
+                      type="button"
+                      onClick={() => { onSwitch(i); setOpen(false); }}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${
+                        isCurrent ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      <span className={`inline-flex items-center justify-center w-6 h-6 rounded text-[10px] font-bold ${
+                        isCurrent ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'
+                      }`}>
+                        v{v.v}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium">
+                          {v.label ?? (i === 0 ? '初始版本' : `第 ${v.v} 版`)}
+                          {isCurrent && <span className="ml-1 text-[10px] text-blue-500">· 当前</span>}
+                        </div>
+                        <div className="text-[10px] text-slate-400">
+                          {new Date(v.createdAt).toLocaleString()}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>,
         document.body,
       )}
     </div>
@@ -1349,7 +1358,7 @@ function EmptyWorkbench({ onNewAudit }: { onNewAudit: () => void }) {
               d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
           </svg>
         </div>
-        <h2 className="text-lg font-semibold text-slate-800 mb-2">开始你的第一次跨端走查</h2>
+        <h2 className="text-lg font-semibold text-slate-800 mb-2 display-title-md">开始你的第一次跨端走查</h2>
         <p className="text-sm text-slate-500 mb-6 leading-relaxed">
           点击左侧「新建走查」，上传 iOS / Android 截图（可选贴 Figma 链接作参考），即可开始比对
         </p>

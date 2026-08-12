@@ -2,8 +2,143 @@
 
 :root {
   --font-sans: var(--font-geist-sans);
+
+  /* ── Material tokens（Apple §12）
+     半透明材质：厚薄用「不透明度 + blur 半径」两档递进
+     结构层（sidebar / header）：中厚 → 内容能透一层
+     交互层（popover / 下拉）：中薄 → 悬于任何背景之上要够清晰
+     ──────────────────────────────────────────────── */
+  --material-thick-bg: rgba(255, 255, 255, 0.70);
+  --material-thick-blur: 20px;
+  --material-regular-bg: rgba(255, 255, 255, 0.80);
+  --material-regular-blur: 16px;
+  --material-thin-bg: rgba(255, 255, 255, 0.90);
+  --material-thin-blur: 12px;
+
+  /* Vibrancy 提示（Apple §12）：半透明表面之上的文字避免用纯浅灰
+     使用者可通过 text-vibrant-primary/secondary 拿到更高对比度 */
+  --vibrant-primary: rgb(15, 23, 42);      /* slate-900 */
+  --vibrant-secondary: rgb(51, 65, 85);    /* slate-700 */
+
+  /* ── Shadow tokens：大表面深阴影 / 小 chip 浅阴影
+     hairline = 半像素边（材质高光边缘感） */
+  --hairline: 1px solid rgba(255, 255, 255, 0.40);
+  --shadow-chip: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-float: 0 6px 20px -4px rgba(15, 23, 42, 0.12), 0 2px 6px -2px rgba(15, 23, 42, 0.08);
+  --shadow-drawer: 0 25px 60px -12px rgba(15, 23, 42, 0.30), 0 8px 20px -6px rgba(15, 23, 42, 0.15);
 }
 
 body {
-  font-family: var(--font-sans), system-ui, sans-serif;
+  /* Apple §15：优先系统字体（自带 optical sizing / tracking table / 中文回退）
+     -apple-system 走系统栈；var(--font-sans) 是 Next 注入的 Geist，作为回退可选 */
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro',
+    var(--font-sans), 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+  /* Apple §15 body：舒适 leading；tracking 保持 0（body 不该有 letter-spacing） */
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
+
+/* Apple §15 大字型：负 tracking + tight leading（size-specific） */
+.display-title {
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  font-optical-sizing: auto;
+}
+.display-headline {
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  font-optical-sizing: auto;
+}
+.display-title-md {
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+/* ── Apple §14 无障碍 media queries ───────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  /* 关掉所有 spring / transition，只留短 opacity 淡入淡出 */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 200ms !important;
+    transition-property: opacity, color, background-color, border-color !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  /* 关掉半透明，改成实心近似色（更粗糙但不刺眼） */
+  .material-thick {
+    background: rgb(248, 250, 252);         /* slate-50 */
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .material-regular {
+    background: rgb(255, 255, 255);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .material-thin {
+    background: rgb(255, 255, 255);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  /* 高对比度：材质变实心 + 边框加深 */
+  .material-thick,
+  .material-regular,
+  .material-thin {
+    background: rgb(255, 255, 255);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border-color: rgb(51, 65, 85) !important;   /* slate-700 */
+  }
+}
+
+/* ── Apple §1 pointer-down 即时反馈：通用 press 态 ───────────────────
+   给 button + [role=button] + [data-press] 加上按下时的 scale
+   （不影响 outline / focus ring；只在 :active 瞬间生效） */
+button:not(:disabled):active,
+[role="button"]:not([aria-disabled="true"]):active,
+[data-press]:active {
+  transform: scale(0.97);
+  transition: transform 100ms ease-out;
+}
+
+/* 关闭 press scale 的 opt-out 类（Portal scrim、图标按钮不需要抖一下） */
+.no-press:active,
+.no-press:not(:disabled):active {
+  transform: none;
+}
+
+/* ── Material utility classes：直接给 className 用 ────────────────── */
+.material-thick {
+  background: var(--material-thick-bg);
+  -webkit-backdrop-filter: blur(var(--material-thick-blur)) saturate(180%);
+  backdrop-filter: blur(var(--material-thick-blur)) saturate(180%);
+}
+.material-regular {
+  background: var(--material-regular-bg);
+  -webkit-backdrop-filter: blur(var(--material-regular-blur)) saturate(180%);
+  backdrop-filter: blur(var(--material-regular-blur)) saturate(180%);
+}
+.material-thin {
+  background: var(--material-thin-bg);
+  -webkit-backdrop-filter: blur(var(--material-thin-blur)) saturate(180%);
+  backdrop-filter: blur(var(--material-thin-blur)) saturate(180%);
+}
+
+/* Shadow utilities */
+.shadow-chip { box-shadow: var(--shadow-chip); }
+.shadow-float { box-shadow: var(--shadow-float); }
+.shadow-drawer { box-shadow: var(--shadow-drawer); }
+
+/* Hairline top edge —— 材质顶边高光 */
+.hairline-top { border-top: var(--hairline); }

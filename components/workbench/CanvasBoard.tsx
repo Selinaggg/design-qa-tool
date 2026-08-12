@@ -28,6 +28,7 @@ import {
   forwardRef,
   type ReactNode,
 } from 'react';
+import { motion, useMotionValue, useSpring, useTransform } from 'motion/react';
 import { CanvasScaleContext } from './CanvasScaleContext';
 
 /** focusOnRect 参数：归一化坐标 + 目标图片 pane 的 DOM 元素 */
@@ -84,6 +85,24 @@ export default forwardRef<CanvasBoardHandle, CanvasBoardProps>(function CanvasBo
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   const [scrollSize, setScrollSize] = useState({ w: 0, h: 0 });
   const [contentNatural, setContentNatural] = useState({ w: 0, h: 0 });
+
+  // ── 缩放 spring（Apple §4）:
+  //   scale (state) = 逻辑目标值，用于 UI/Context/计算
+  //   springScale (motion value) = 呈现值，跟 UI transform 走 spring，可中断
+  //   两者通过 useEffect 同步：目标改 → spring 弹过去
+  const rawScale = useMotionValue(initialScale);
+  const springScale = useSpring(rawScale, {
+    // Apple UI 默认：damping 1.0（无 overshoot）
+    // 缩放场景 duration 稍短，因为 layout 尺寸走逻辑值、transform 走 spring value，
+    // 两者略有时差；短 duration 让人眼几乎察觉不到（<250ms）
+    bounce: 0,
+    duration: 0.25,
+  });
+  useEffect(() => {
+    rawScale.set(scale);
+  }, [scale, rawScale]);
+  // 缩放变换字符串，喂给 motion.div
+  const springTransform = useTransform(springScale, (s) => `scale(${s})`);
 
   // ── 自动适应：内容或容器尺寸变化时，只要用户没手动调过缩放，就重算 fit ──
   const userAdjustedRef = useRef(false);
@@ -178,7 +197,10 @@ export default forwardRef<CanvasBoardHandle, CanvasBoardProps>(function CanvasBo
     },
   }), [scale]);
 
-  // ── 滚轮缩放（只响应 Cmd/Ctrl） ──
+  // ── 滚轮缩放（只响应 Cmd/Ctrl）
+  //   spring 版：直接 setScale 到目标值，spring 自动从当前呈现值起步弹过去
+  //   到达边界时不再是硬停：spring 会因超出 clamp 而自然弹回（无需 rubber-band 视觉突破，
+  //   Apple §9 里 rubber-band 是给拖拽用的；缩放到边界只需 spring 稍带减速感即可）
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -214,8 +236,9 @@ export default forwardRef<CanvasBoardHandle, CanvasBoardProps>(function CanvasBo
     setCursor(next);
   }, []);
 
-  const onMouseMove = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
+  // Pointer Events（Apple §2）：统一鼠标 / 触控 / 触摸屏轨迹
+  const onPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
       if (!contentInnerRef.current) return;
       const rect = contentInnerRef.current.getBoundingClientRect();
       if (rect.width === 0 || rect.height === 0) return;
@@ -233,7 +256,7 @@ export default forwardRef<CanvasBoardHandle, CanvasBoardProps>(function CanvasBo
     [flushCursor],
   );
 
-  const onMouseLeave = useCallback(() => {
+  const onPointerLeave = useCallback(() => {
     pendingCursorRef.current = null;
     if (cursorRafRef.current == null) {
       cursorRafRef.current = requestAnimationFrame(flushCursor);
@@ -293,8 +316,8 @@ export default forwardRef<CanvasBoardHandle, CanvasBoardProps>(function CanvasBo
       ref={wrapperRef}
       className={
         height === 'fill'
-          ? 'relative w-full flex-1 min-h-0 rounded-2xl border border-slate-200 bg-white overflow-hidden'
-          : 'relative w-full rounded-2xl border border-slate-200 bg-white overflow-hidden'
+          ? 'relative w-full flex-1 min-h-0 rounded-2xl border border-slate-200/60 bg-white overflow-hidden shadow-chip'
+          : 'relative w-full rounded-2xl border border-slate-200/60 bg-white overflow-hidden shadow-chip'
       }
       style={
         height === 'fill'
@@ -317,8 +340,8 @@ export default forwardRef<CanvasBoardHandle, CanvasBoardProps>(function CanvasBo
           backgroundSize: '20px 20px, 20px 20px, 100px 100px, 100px 100px',
           backgroundPosition: `${RULER}px ${RULER}px`,
         }}
-        onMouseMove={onMouseMove}
-        onMouseLeave={onMouseLeave}
+        onPointerMove={onPointerMove}
+        onPointerLeave={onPointerLeave}
       >
         {/* Fix-4: 内容容器用 px 尺寸驱动，避免 100% + 滚动条循环 */}
         <div
@@ -332,9 +355,11 @@ export default forwardRef<CanvasBoardHandle, CanvasBoardProps>(function CanvasBo
             position: 'relative',
           }}
         >
-          <div
+          {/* spring 缩放：visual transform 走 spring value，layout 仍用逻辑 scale
+              这样 spring 中途 layout 不抖，滚动条稳定，只有画面本身 fluid 弹动 */}
+          <motion.div
             style={{
-              transform: `scale(${scale})`,
+              transform: springTransform,
               transformOrigin: 'top left',
               width: scaledW > 0 ? scaledW : undefined,
               height: scaledH > 0 ? scaledH : undefined,
@@ -346,7 +371,7 @@ export default forwardRef<CanvasBoardHandle, CanvasBoardProps>(function CanvasBo
                 {children}
               </CanvasScaleContext.Provider>
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
 
@@ -412,9 +437,9 @@ export default forwardRef<CanvasBoardHandle, CanvasBoardProps>(function CanvasBo
         </div>
       )}
 
-      {/* 右下角：缩放控件 */}
+      {/* 右下角：缩放控件 —— chip 材质（薄），浅阴影 */}
       <div
-        className="absolute z-30 flex items-center gap-1 rounded-lg border border-slate-200 bg-white/95 backdrop-blur px-1 py-1 shadow-sm"
+        className="absolute z-30 flex items-center gap-1 rounded-lg border border-slate-200/60 material-thin px-1 py-1 shadow-float"
         style={{
           bottom: CONTROLS_PAD,
           right: CONTROLS_PAD,
@@ -462,10 +487,10 @@ export default forwardRef<CanvasBoardHandle, CanvasBoardProps>(function CanvasBo
         </button>
       </div>
 
-      {/* 鼠标坐标浮标 */}
+      {/* 鼠标坐标浮标 —— 深色 chip，也走轻材质（backdrop blur 让下方图能透一点） */}
       {cursor && (
         <div
-          className="pointer-events-none absolute z-30 rounded-md bg-slate-900/85 text-white text-[10px] font-mono px-2 py-1 shadow-lg"
+          className="pointer-events-none absolute z-30 rounded-md bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-mono px-2 py-1 shadow-float"
           style={{
             bottom: CONTROLS_PAD + 44,
             right: CONTROLS_PAD,
