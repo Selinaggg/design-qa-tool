@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
+import { Collapse } from '@/components/ui/Collapse';
 import DropZone from '@/components/upload/DropZone';
 import FigmaImport from '@/components/upload/FigmaImport';
 import ScreenshotBatchDropzone from './ScreenshotBatchDropzone';
@@ -247,19 +249,29 @@ export default function NewAuditDrawer({
     resetAll(false);
   };
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex">
-      {/* Mask */}
-      <div
-        className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px]"
-        onClick={onClose}
-      />
+    <AnimatePresence>
+      {open && (
+        <div className="fixed inset-0 z-50 flex">
+          {/* Mask */}
+          <motion.div
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px]"
+            onClick={onClose}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          />
 
-      {/* Drawer */}
-      <aside className="relative ml-auto h-full w-full max-w-[720px] bg-white shadow-2xl flex flex-col animate-[slideIn_0.2s_ease-out]">
-        <style>{`@keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }`}</style>
+          {/* Drawer */}
+          <motion.aside
+            className="relative ml-auto h-full w-full max-w-[720px] bg-white shadow-2xl flex flex-col"
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            // Apple drawer/sheet spec: damping 0.8 / response 0.3 → bounce 0.2 / duration 0.3
+            transition={{ type: 'spring', bounce: 0.2, duration: 0.3 }}
+          >
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 flex-shrink-0">
@@ -634,8 +646,10 @@ export default function NewAuditDrawer({
             </button>
           </div>
         </div>
-      </aside>
-    </div>
+          </motion.aside>
+        </div>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -860,7 +874,7 @@ function AIConfigPanel() {
       </button>
 
       {/* Body */}
-      {expanded && (
+      <Collapse open={expanded}>
         <div className="border-t border-slate-100 px-4 py-4 flex flex-col gap-3 bg-slate-50/50">
           {/* Provider 选择 */}
           <div className="flex flex-col gap-1.5">
@@ -988,7 +1002,7 @@ function AIConfigPanel() {
             )}
           </div>
         </div>
-      )}
+      </Collapse>
     </div>
   );
 }
@@ -1302,7 +1316,7 @@ function IgnoreRulesPanel({
               </div>
 
               {/* 展开区：规则列表 */}
-              {isExpanded && (
+              <Collapse open={isExpanded}>
                 <div className="border-t border-slate-100 bg-slate-50/50 px-2.5 py-2 flex flex-col gap-1.5">
                   {groupRules.map((rule) => (
                     <label
@@ -1326,7 +1340,7 @@ function IgnoreRulesPanel({
                     </label>
                   ))}
                 </div>
-              )}
+              </Collapse>
             </div>
           );
         })}

@@ -12,6 +12,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { AnimatePresence, motion } from 'motion/react';
 import type { AuditSession } from './types';
 import type { PlatformConsistencyIssue, IssueSeverityCP } from '@/lib/crossPlatform';
 import { computeVersionDiff } from '@/lib/sessionHelpers';
@@ -34,8 +35,14 @@ const SEV_STYLE: Record<IssueSeverityCP, string> = {
 };
 
 export default function VersionDiffDialog(props: VersionDiffDialogProps) {
-  if (!props.open) return null;
-  return <DialogInner key={`${props.defaultFromIndex}:${props.defaultToIndex}`} {...props} />;
+  // 用 AnimatePresence 包裹让 exit 动画能播完，key 用 open 状态区分
+  return (
+    <AnimatePresence>
+      {props.open && (
+        <DialogInner key={`${props.defaultFromIndex}:${props.defaultToIndex}`} {...props} />
+      )}
+    </AnimatePresence>
+  );
 }
 
 function DialogInner({
@@ -82,10 +89,22 @@ function DialogInner({
 
   const dialog = (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center">
-      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
+      <motion.div
+        className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
+        onClick={onClose}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+      />
 
-      <div className="relative w-full max-w-[880px] max-h-[85vh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-[fadeIn_0.15s_ease-out]">
-        <style>{`@keyframes fadeIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }`}</style>
+      <motion.div
+        className="relative w-full max-w-[880px] max-h-[85vh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+        initial={{ opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.96 }}
+        transition={{ type: 'spring', bounce: 0, duration: 0.3 }}
+      >
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
@@ -239,7 +258,7 @@ function DialogInner({
             </button>
           </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 
