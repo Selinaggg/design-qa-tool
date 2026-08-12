@@ -255,7 +255,7 @@ export default function NewAuditDrawer({
         <div className="fixed inset-0 z-50 flex">
           {/* Mask —— 深色模态 scrim（Apple §12：模态用 dim + push back） */}
           <motion.div
-            className="absolute inset-0 bg-slate-900/50 backdrop-blur-md"
+            className="absolute inset-0 bg-slate-900/50 backdrop-blur-md no-press"
             onClick={onClose}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -282,7 +282,7 @@ export default function NewAuditDrawer({
                   <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-purple-100 text-purple-700">
                     新版本 v{parentSession.versions.length + 1}
                   </span>
-                  <h2 className="text-lg font-semibold text-slate-900 truncate">{parentSession.name}</h2>
+                  <h2 className="text-lg font-semibold text-slate-900 truncate display-title-md">{parentSession.name}</h2>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
                   上传研发修改后的新截图（至少一端）；标注区域与设备配置将从上一版继承
@@ -290,7 +290,7 @@ export default function NewAuditDrawer({
               </>
             ) : (
               <>
-                <h2 className="text-lg font-semibold text-slate-900">新建走查</h2>
+                <h2 className="text-lg font-semibold text-slate-900 display-title-md">新建走查</h2>
                 <p className="text-xs text-slate-500 mt-0.5">上传 iOS 或 Android 截图（至少一端），可选 Figma 设计稿作参考</p>
               </>
             )}

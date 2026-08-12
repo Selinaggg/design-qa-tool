@@ -29,7 +29,93 @@
 }
 
 body {
-  font-family: var(--font-sans), system-ui, sans-serif;
+  /* Apple §15：优先系统字体（自带 optical sizing / tracking table / 中文回退）
+     -apple-system 走系统栈；var(--font-sans) 是 Next 注入的 Geist，作为回退可选 */
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro',
+    var(--font-sans), 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+  /* Apple §15 body：舒适 leading；tracking 保持 0（body 不该有 letter-spacing） */
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Apple §15 大字型：负 tracking + tight leading（size-specific） */
+.display-title {
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  font-optical-sizing: auto;
+}
+.display-headline {
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  font-optical-sizing: auto;
+}
+.display-title-md {
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+/* ── Apple §14 无障碍 media queries ───────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  /* 关掉所有 spring / transition，只留短 opacity 淡入淡出 */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 200ms !important;
+    transition-property: opacity, color, background-color, border-color !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  /* 关掉半透明，改成实心近似色（更粗糙但不刺眼） */
+  .material-thick {
+    background: rgb(248, 250, 252);         /* slate-50 */
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .material-regular {
+    background: rgb(255, 255, 255);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .material-thin {
+    background: rgb(255, 255, 255);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  /* 高对比度：材质变实心 + 边框加深 */
+  .material-thick,
+  .material-regular,
+  .material-thin {
+    background: rgb(255, 255, 255);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border-color: rgb(51, 65, 85) !important;   /* slate-700 */
+  }
+}
+
+/* ── Apple §1 pointer-down 即时反馈：通用 press 态 ───────────────────
+   给 button + [role=button] + [data-press] 加上按下时的 scale
+   （不影响 outline / focus ring；只在 :active 瞬间生效） */
+button:not(:disabled):active,
+[role="button"]:not([aria-disabled="true"]):active,
+[data-press]:active {
+  transform: scale(0.97);
+  transition: transform 100ms ease-out;
+}
+
+/* 关闭 press scale 的 opt-out 类（Portal scrim、图标按钮不需要抖一下） */
+.no-press:active,
+.no-press:not(:disabled):active {
+  transform: none;
 }
 
 /* ── Material utility classes：直接给 className 用 ────────────────── */

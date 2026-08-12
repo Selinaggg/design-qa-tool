@@ -1072,7 +1072,7 @@ function VersionSwitcher({
         <AnimatePresence>
           {open && (
             <>
-              <div className="fixed inset-0 z-[99]" onClick={() => setOpen(false)} />
+              <div className="fixed inset-0 z-[99] no-press" onClick={() => setOpen(false)} />
               <motion.div
                 className="fixed min-w-[200px] rounded-lg border border-slate-200/60 material-thin shadow-float z-[100] py-1"
                 style={{ top: dropdownPos.top, left: dropdownPos.left, transformOrigin: 'top left' }}
@@ -1358,7 +1358,7 @@ function EmptyWorkbench({ onNewAudit }: { onNewAudit: () => void }) {
               d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
           </svg>
         </div>
-        <h2 className="text-lg font-semibold text-slate-800 mb-2">开始你的第一次跨端走查</h2>
+        <h2 className="text-lg font-semibold text-slate-800 mb-2 display-title-md">开始你的第一次跨端走查</h2>
         <p className="text-sm text-slate-500 mb-6 leading-relaxed">
           点击左侧「新建走查」，上传 iOS / Android 截图（可选贴 Figma 链接作参考），即可开始比对
         </p>

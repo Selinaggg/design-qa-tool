@@ -90,7 +90,7 @@ function DialogInner({
   const dialog = (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center">
       <motion.div
-        className="absolute inset-0 bg-slate-900/50 backdrop-blur-md"
+        className="absolute inset-0 bg-slate-900/50 backdrop-blur-md no-press"
         onClick={onClose}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -321,7 +321,7 @@ function ScoreCard({
     <div className="p-4 rounded-xl border border-slate-200 bg-white">
       <p className="text-xs text-slate-500 mb-1.5">{label}</p>
       <div className="flex items-baseline gap-2">
-        <span className="text-2xl font-bold tabular-nums text-slate-800">
+        <span className="text-2xl font-bold tabular-nums text-slate-800 display-headline">
           {toValue ?? '—'}
         </span>
         {hasBoth && (

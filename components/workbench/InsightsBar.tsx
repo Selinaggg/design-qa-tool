@@ -69,7 +69,7 @@ export default function InsightsBar({
       {/* 问题分布 */}
       <div className="flex flex-col justify-center min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
-          <span className="text-2xl font-bold tabular-nums text-slate-800">
+          <span className="text-2xl font-bold tabular-nums text-slate-800 display-headline">
             {hasResult ? totalIssues : '—'}
           </span>
           <span className="text-xs text-slate-500">项差异</span>
@@ -274,7 +274,7 @@ function ScoreBlock({ label, score, emphasis, delta }: { label: string; score?: 
   if (score == null) {
     return (
       <div className="flex flex-col justify-center min-w-[92px]">
-        <span className={`${emphasis ? 'text-3xl' : 'text-2xl'} font-bold tabular-nums text-slate-300`}>—</span>
+        <span className={`${emphasis ? 'text-3xl' : 'text-2xl'} font-bold tabular-nums text-slate-300 display-headline`}>—</span>
         <div className="text-[11px] text-slate-400 mt-0.5">{label}</div>
       </div>
     );
@@ -286,7 +286,7 @@ function ScoreBlock({ label, score, emphasis, delta }: { label: string; score?: 
   return (
     <div className="flex flex-col justify-center min-w-[92px]">
       <div className="flex items-baseline gap-1.5">
-        <span className={`${emphasis ? 'text-3xl' : 'text-2xl'} font-bold tabular-nums`} style={{ color: grade.color }}>
+        <span className={`${emphasis ? 'text-3xl' : 'text-2xl'} font-bold tabular-nums display-headline`} style={{ color: grade.color }}>
           {score}
         </span>
         <span
