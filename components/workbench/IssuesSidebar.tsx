@@ -116,7 +116,7 @@ export default function IssuesSidebar({
   const effectiveScope: 'active' | 'all' = showScopeToggle ? scope : 'active';
 
   return (
-    <aside className="w-[360px] min-w-[360px] flex-shrink-0 flex flex-col bg-white border-l border-slate-200">
+    <aside className="w-[360px] min-w-[360px] flex-shrink-0 flex flex-col material-thick border-l border-slate-200/60">
       {/* Header */}
       <div className="flex flex-col gap-3 p-4 border-b border-slate-100">
         <div className="flex items-center justify-between">

@@ -120,7 +120,7 @@ const ConsistencyIssueCard = forwardRef<HTMLDivElement, ConsistencyIssueCardProp
       ref={ref}
       className={`border rounded-xl overflow-hidden bg-white transition-all ${
         isHighlighted
-          ? 'border-blue-400 ring-2 ring-blue-100 shadow-md'
+          ? 'border-blue-400 ring-2 ring-blue-100 shadow-float'
           : issue.isAcceptablePlatformDifference
             ? 'border-slate-200 opacity-80'
             : 'border-slate-200'

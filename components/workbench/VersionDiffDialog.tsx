@@ -90,7 +90,7 @@ function DialogInner({
   const dialog = (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center">
       <motion.div
-        className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-slate-900/50 backdrop-blur-md"
         onClick={onClose}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -99,7 +99,7 @@ function DialogInner({
       />
 
       <motion.div
-        className="relative w-full max-w-[880px] max-h-[85vh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+        className="relative w-full max-w-[880px] max-h-[85vh] bg-white rounded-2xl shadow-drawer flex flex-col overflow-hidden border border-white/40"
         initial={{ opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.96 }}

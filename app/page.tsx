@@ -363,7 +363,7 @@ export default function Home() {
   }, [activeSessionId]);
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50">
+    <div className="flex flex-col h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
       <AppHeader />
 
       <div className="flex flex-1 min-h-0 overflow-hidden">

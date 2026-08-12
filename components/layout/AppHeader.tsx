@@ -12,7 +12,7 @@ export default function AppHeader() {
   const pathname = usePathname();
 
   return (
-    <header className="sticky top-0 z-10 bg-white border-b border-slate-200">
+    <header className="sticky top-0 z-10 material-thick border-b border-slate-200/60">
       <div className="px-6 py-3 flex items-center justify-between">
         {/* Logo + nav */}
         <div className="flex items-center gap-5">

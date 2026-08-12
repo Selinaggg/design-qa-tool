@@ -2,8 +2,57 @@
 
 :root {
   --font-sans: var(--font-geist-sans);
+
+  /* ── Material tokens（Apple §12）
+     半透明材质：厚薄用「不透明度 + blur 半径」两档递进
+     结构层（sidebar / header）：中厚 → 内容能透一层
+     交互层（popover / 下拉）：中薄 → 悬于任何背景之上要够清晰
+     ──────────────────────────────────────────────── */
+  --material-thick-bg: rgba(255, 255, 255, 0.70);
+  --material-thick-blur: 20px;
+  --material-regular-bg: rgba(255, 255, 255, 0.80);
+  --material-regular-blur: 16px;
+  --material-thin-bg: rgba(255, 255, 255, 0.90);
+  --material-thin-blur: 12px;
+
+  /* Vibrancy 提示（Apple §12）：半透明表面之上的文字避免用纯浅灰
+     使用者可通过 text-vibrant-primary/secondary 拿到更高对比度 */
+  --vibrant-primary: rgb(15, 23, 42);      /* slate-900 */
+  --vibrant-secondary: rgb(51, 65, 85);    /* slate-700 */
+
+  /* ── Shadow tokens：大表面深阴影 / 小 chip 浅阴影
+     hairline = 半像素边（材质高光边缘感） */
+  --hairline: 1px solid rgba(255, 255, 255, 0.40);
+  --shadow-chip: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-float: 0 6px 20px -4px rgba(15, 23, 42, 0.12), 0 2px 6px -2px rgba(15, 23, 42, 0.08);
+  --shadow-drawer: 0 25px 60px -12px rgba(15, 23, 42, 0.30), 0 8px 20px -6px rgba(15, 23, 42, 0.15);
 }
 
 body {
   font-family: var(--font-sans), system-ui, sans-serif;
 }
+
+/* ── Material utility classes：直接给 className 用 ────────────────── */
+.material-thick {
+  background: var(--material-thick-bg);
+  -webkit-backdrop-filter: blur(var(--material-thick-blur)) saturate(180%);
+  backdrop-filter: blur(var(--material-thick-blur)) saturate(180%);
+}
+.material-regular {
+  background: var(--material-regular-bg);
+  -webkit-backdrop-filter: blur(var(--material-regular-blur)) saturate(180%);
+  backdrop-filter: blur(var(--material-regular-blur)) saturate(180%);
+}
+.material-thin {
+  background: var(--material-thin-bg);
+  -webkit-backdrop-filter: blur(var(--material-thin-blur)) saturate(180%);
+  backdrop-filter: blur(var(--material-thin-blur)) saturate(180%);
+}
+
+/* Shadow utilities */
+.shadow-chip { box-shadow: var(--shadow-chip); }
+.shadow-float { box-shadow: var(--shadow-float); }
+.shadow-drawer { box-shadow: var(--shadow-drawer); }
+
+/* Hairline top edge —— 材质顶边高光 */
+.hairline-top { border-top: var(--hairline); }

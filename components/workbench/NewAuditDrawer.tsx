@@ -253,9 +253,9 @@ export default function NewAuditDrawer({
     <AnimatePresence>
       {open && (
         <div className="fixed inset-0 z-50 flex">
-          {/* Mask */}
+          {/* Mask —— 深色模态 scrim（Apple §12：模态用 dim + push back） */}
           <motion.div
-            className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px]"
+            className="absolute inset-0 bg-slate-900/50 backdrop-blur-md"
             onClick={onClose}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -263,9 +263,9 @@ export default function NewAuditDrawer({
             transition={{ duration: 0.2 }}
           />
 
-          {/* Drawer */}
+          {/* Drawer —— 内容密集，主体保持纯白（vibrancy 规则），阴影加深 */}
           <motion.aside
-            className="relative ml-auto h-full w-full max-w-[720px] bg-white shadow-2xl flex flex-col"
+            className="relative ml-auto h-full w-full max-w-[720px] bg-white shadow-drawer flex flex-col border-l border-white/40"
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}

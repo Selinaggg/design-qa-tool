@@ -316,8 +316,8 @@ export default forwardRef<CanvasBoardHandle, CanvasBoardProps>(function CanvasBo
       ref={wrapperRef}
       className={
         height === 'fill'
-          ? 'relative w-full flex-1 min-h-0 rounded-2xl border border-slate-200 bg-white overflow-hidden'
-          : 'relative w-full rounded-2xl border border-slate-200 bg-white overflow-hidden'
+          ? 'relative w-full flex-1 min-h-0 rounded-2xl border border-slate-200/60 bg-white overflow-hidden shadow-chip'
+          : 'relative w-full rounded-2xl border border-slate-200/60 bg-white overflow-hidden shadow-chip'
       }
       style={
         height === 'fill'
@@ -437,9 +437,9 @@ export default forwardRef<CanvasBoardHandle, CanvasBoardProps>(function CanvasBo
         </div>
       )}
 
-      {/* 右下角：缩放控件 */}
+      {/* 右下角：缩放控件 —— chip 材质（薄），浅阴影 */}
       <div
-        className="absolute z-30 flex items-center gap-1 rounded-lg border border-slate-200 bg-white/95 backdrop-blur px-1 py-1 shadow-sm"
+        className="absolute z-30 flex items-center gap-1 rounded-lg border border-slate-200/60 material-thin px-1 py-1 shadow-float"
         style={{
           bottom: CONTROLS_PAD,
           right: CONTROLS_PAD,
@@ -487,10 +487,10 @@ export default forwardRef<CanvasBoardHandle, CanvasBoardProps>(function CanvasBo
         </button>
       </div>
 
-      {/* 鼠标坐标浮标 */}
+      {/* 鼠标坐标浮标 —— 深色 chip，也走轻材质（backdrop blur 让下方图能透一点） */}
       {cursor && (
         <div
-          className="pointer-events-none absolute z-30 rounded-md bg-slate-900/85 text-white text-[10px] font-mono px-2 py-1 shadow-lg"
+          className="pointer-events-none absolute z-30 rounded-md bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-mono px-2 py-1 shadow-float"
           style={{
             bottom: CONTROLS_PAD + 44,
             right: CONTROLS_PAD,

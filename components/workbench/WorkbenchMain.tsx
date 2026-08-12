@@ -314,8 +314,8 @@ export default function WorkbenchMain({
 
   return (
     <main className="flex-1 min-w-0 flex flex-col bg-slate-50 overflow-hidden">
-      {/* Session header */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-slate-200 bg-white flex-shrink-0">
+      {/* Session header —— 半透明 chrome，内容从下方穿过（Apple §12） */}
+      <div className="flex items-center justify-between px-6 py-3 border-b border-slate-200/60 material-thick flex-shrink-0">
         <div className="flex items-center gap-3 min-w-0">
           <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-purple-100 text-purple-700">
             跨端走查
@@ -793,7 +793,7 @@ function WorkbenchToolBar({
     }`;
 
   return (
-    <div className="relative z-50 flex items-center gap-1 px-3 py-1.5 border-b border-slate-200 bg-white flex-shrink-0 min-w-0">
+    <div className="relative z-50 flex items-center gap-1 px-3 py-1.5 border-b border-slate-200/60 material-regular flex-shrink-0 min-w-0">
       {/* ── 版本组 ── */}
       <VersionSwitcher
         session={session}
@@ -1074,7 +1074,7 @@ function VersionSwitcher({
             <>
               <div className="fixed inset-0 z-[99]" onClick={() => setOpen(false)} />
               <motion.div
-                className="fixed min-w-[200px] rounded-lg border border-slate-200 bg-white shadow-xl z-[100] py-1"
+                className="fixed min-w-[200px] rounded-lg border border-slate-200/60 material-thin shadow-float z-[100] py-1"
                 style={{ top: dropdownPos.top, left: dropdownPos.left, transformOrigin: 'top left' }}
                 initial={{ opacity: 0, scale: 0.95, y: -4 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
