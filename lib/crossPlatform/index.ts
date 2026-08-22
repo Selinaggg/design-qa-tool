@@ -88,7 +88,14 @@ export function getCrossPlatformAnalyzer(override?: CrossPlatformOverride): Cros
 }
 
 function resolveProvider(name: string | null | undefined): VisionProviderName {
-  if (name === 'claude' || name === 'openai' || name === 'maas' || name === 'maas-direct') {
+  if (
+    name === 'claude' ||
+    name === 'openai' ||
+    name === 'maas' ||
+    name === 'maas-direct' ||
+    name === 'maas-openai' ||
+    name === 'maas-doubao'
+  ) {
     return name;
   }
   return 'claude'; // 默认 claude
@@ -97,7 +104,7 @@ function resolveProvider(name: string | null | undefined): VisionProviderName {
 function envApiKeyFor(provider: VisionProviderName): string | undefined {
   if (provider === 'claude') return process.env.ANTHROPIC_API_KEY;
   if (provider === 'openai') return process.env.OPENAI_API_KEY;
-  // maas 和 maas-direct 都用同一个 QST token
+  // maas / maas-direct / maas-openai / maas-doubao 四兄弟共用同一个 QST token
   return process.env.MAAS_TOKEN;
 }
 

@@ -1,4 +1,5 @@
 import type { VisionClient, VisionRequest, VisionResponse } from './types';
+import { requestJsonWithRetry } from './http';
 
 const CLAUDE_MODEL = 'claude-opus-4-7';
 const API_URL = 'https://api.anthropic.com/v1/messages';
@@ -53,35 +54,43 @@ export class ClaudeVisionClient implements VisionClient {
     }
     content.push({ type: 'text', text: req.userPrompt });
 
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        'x-api-key': this.apiKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
+    const result = await requestJsonWithRetry<ClaudeResponse>(
+      API_URL,
+      {
+        method: 'POST',
+        headers: {
+          'x-api-key': this.apiKey,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: CLAUDE_MODEL,
+          max_tokens: req.maxTokens ?? 4096,
+          system: req.systemPrompt,
+          messages: [{ role: 'user', content }],
+        }),
       },
-      body: JSON.stringify({
-        model: CLAUDE_MODEL,
-        max_tokens: req.maxTokens ?? 4096,
-        system: req.systemPrompt,
-        messages: [{ role: 'user', content }],
-      }),
-    });
+      { label: 'Claude' },
+    );
 
-    const data = (await res.json()) as ClaudeResponse;
-
-    if (!res.ok) {
-      throw new Error(`Claude API error (${res.status}): ${data.error?.message ?? 'unknown'}`);
+    if (!result.ok || !result.json) {
+      // 优先级：结构化 error.message > raw body > parseError 兜底
+      const reason =
+        result.json?.error?.message ??
+        (result.raw ? result.raw.slice(0, 400) : undefined) ??
+        result.parseError ??
+        'unknown';
+      throw new Error(`Claude API error (HTTP ${result.status}): ${reason}`);
     }
 
-    const text = (data.content ?? [])
+    const text = (result.json.content ?? [])
       .filter((b) => b.type === 'text' && typeof b.text === 'string')
       .map((b) => b.text as string)
       .join('\n')
       .trim();
 
     if (!text) {
-      throw new Error('Claude API returned empty content');
+      throw new Error(`Claude API returned empty content；原始响应：${result.raw.slice(0, 300)}`);
     }
 
     return { text, model: CLAUDE_MODEL };

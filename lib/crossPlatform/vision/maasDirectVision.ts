@@ -1,4 +1,5 @@
 import type { VisionClient, VisionRequest, VisionResponse } from './types';
+import { requestJsonWithRetry } from './http';
 
 const API_URL = 'https://maas.devops.xiaohongshu.com/v1/chat/completions';
 const DEFAULT_MODEL = 'qwen3-vl-30b-a3b-instruct';
@@ -48,50 +49,49 @@ export class MaasDirectVisionClient implements VisionClient {
     }
     userContent.push({ type: 'text', text: req.userPrompt });
 
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json',
-        // MaaS 网关要求的额外 header
-        'x-maas-user-email': '',
-        'x-maas-app-id': 'qs-api',
+    const result = await requestJsonWithRetry<DirectResponse>(
+      API_URL,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+          // MaaS 网关要求的额外 header
+          'x-maas-user-email': '',
+          'x-maas-app-id': 'qs-api',
+        },
+        body: JSON.stringify({
+          model: this.model,
+          max_tokens: req.maxTokens ?? 4096,
+          temperature: 0.3, // 走查任务需要稳定输出，不需要发散
+          messages: [
+            { role: 'system', content: req.systemPrompt },
+            { role: 'user', content: userContent },
+          ],
+          stream: false,
+        }),
       },
-      body: JSON.stringify({
-        model: this.model,
-        max_tokens: req.maxTokens ?? 4096,
-        temperature: 0.3, // 走查任务需要稳定输出，不需要发散
-        // 注意：不是所有 MaaS 模型都支持 response_format=json_object
-        // Qwen 视觉模型未验证；如报错可改为在 prompt 里强调 JSON only
-        messages: [
-          { role: 'system', content: req.systemPrompt },
-          { role: 'user', content: userContent },
-        ],
-        stream: false,
-      }),
-    });
+      { label: 'MaaS DirectLLM' },
+    );
 
-    let data: DirectResponse;
-    try {
-      data = (await res.json()) as DirectResponse;
-    } catch (err) {
-      const raw = await res.text().catch(() => '<no body>');
-      throw new Error(
-        `MaaS DirectLLM 响应不是合法 JSON (${res.status}): ${raw.slice(0, 300)}\n原因：${
-          err instanceof Error ? err.message : String(err)
-        }`,
-      );
+    if (!result.ok || !result.json) {
+      // 报错信息优先级：网关结构化 error.message > raw body（原始文本，
+      // 含 brpc "unsupported model" 等关键信息）> parseError 兜底
+      // 修 bug：以前先 parseError，会把「MaaS 400 但 body 是 brpc 纯文本」的场景
+      // 显示成 "Unexpected token 'b', "brpc [10.7"... is not valid JSON"，用户看不懂
+      const reason =
+        result.json?.error?.message ??
+        (result.raw ? result.raw.slice(0, 400) : undefined) ??
+        result.parseError ??
+        '未知错误';
+      throw new Error(`MaaS DirectLLM API error (HTTP ${result.status}): ${reason}`);
     }
 
-    if (!res.ok) {
-      throw new Error(
-        `MaaS DirectLLM API error (${res.status}): ${data.error?.message ?? JSON.stringify(data).slice(0, 300)}`,
-      );
-    }
-
-    const text = data.choices?.[0]?.message?.content?.trim();
+    const text = result.json.choices?.[0]?.message?.content?.trim();
     if (!text) {
-      throw new Error('MaaS DirectLLM 返回内容为空');
+      throw new Error(
+        `MaaS DirectLLM 返回内容为空；原始响应：${result.raw.slice(0, 300)}`,
+      );
     }
 
     return { text, model: this.model };

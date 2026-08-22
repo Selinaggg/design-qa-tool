@@ -7,7 +7,8 @@ import RulerOverlay from '@/components/comparison/RulerOverlay';
 import ManualDrawOverlay from '@/components/comparison/ManualDrawOverlay';
 import RegionOverlayEditor from './RegionOverlayEditor';
 import type { ImageFile } from '@/types';
-import type { DrawingRegion, NormalizedRect } from '@/lib/crossPlatform/types';
+import type { DeviceProfile, DrawingRegion, NormalizedRect } from '@/lib/crossPlatform/types';
+import { deriveRulerScale, unitFromDeviceProfile, unitFromPlatform } from '@/lib/rulerScale';
 
 interface PlatformComparisonProps {
   iosImage?: ImageFile | null;
@@ -15,6 +16,16 @@ interface PlatformComparisonProps {
   designImage?: ImageFile | null;
   iosDeviceName: string;
   androidDeviceName: string;
+  /** iOS 设备 profile（用于尺子换算逻辑单位）；缺省时尺子退回 px */
+  iosDevice?: DeviceProfile | null;
+  /** Android 设备 profile（用于尺子换算逻辑单位）；缺省时尺子退回 px */
+  androidDevice?: DeviceProfile | null;
+  /**
+   * 设计稿参照的设备 profile（用于尺子换算逻辑单位）。
+   * 如果设计稿是按 iPhone 14 @1x 出稿的（375×812），可以传 iosDevice；
+   * 通常传对齐目标端的 profile 即可，让三把尺子对齐。缺省时尺子按 px @1x。
+   */
+  designDevice?: DeviceProfile | null;
   iosRegions?: DrawingRegion[];
   androidRegions?: DrawingRegion[];
   highlightedRegionName?: string | null;
@@ -55,6 +66,9 @@ export default function PlatformComparison({
   designImage,
   iosDeviceName,
   androidDeviceName,
+  iosDevice,
+  androidDevice,
+  designDevice,
   iosRegions = [],
   androidRegions = [],
   highlightedRegionName,
@@ -130,6 +144,8 @@ export default function PlatformComparison({
             manualDraftRect={iosDraftRect}
             onManualDrawn={(rect) => onDrawnDraft?.('ios', rect)}
             highlightRect={iosHighlightRect}
+            deviceProfile={iosDevice}
+            paneKind="ios"
           />
         </div>
       )}
@@ -156,6 +172,8 @@ export default function PlatformComparison({
             manualDraftRect={androidDraftRect}
             onManualDrawn={(rect) => onDrawnDraft?.('android', rect)}
             highlightRect={androidHighlightRect}
+            deviceProfile={androidDevice}
+            paneKind="android"
           />
         </div>
       )}
@@ -179,6 +197,9 @@ export default function PlatformComparison({
             clearScreen={clearScreen}
             // 设计稿不参与手工标注
             manualMode="idle"
+            // 设计稿默认对齐 iOS 端出稿（375pt/390pt），没显式传 designDevice 时退回 iosDevice
+            deviceProfile={designDevice ?? iosDevice ?? null}
+            paneKind="design"
           />
         </div>
       )}
@@ -207,6 +228,8 @@ function ImagePane({
   manualDraftRect,
   onManualDrawn,
   highlightRect,
+  deviceProfile,
+  paneKind,
 }: {
   image: ImageFile;
   label: string;
@@ -234,7 +257,16 @@ function ImagePane({
   onManualDrawn?: (rect: NormalizedRect) => void;
   /** 点击卡片时高亮的问题区域（方案 4 发光描边） */
   highlightRect?: NormalizedRect | null;
+  /** 设备 profile，用于尺子把源像素换算成 pt/dp（方案 B） */
+  deviceProfile?: DeviceProfile | null;
+  /** 该 pane 的性质，决定尺子单位选择：ios→pt / android→dp / design→px */
+  paneKind: 'ios' | 'android' | 'design';
 }) {
+  // 尺子逻辑单位换算（方案 B）
+  // design pane 优先按传入的参照 profile 决定单位；其他 pane 按平台固定
+  const rulerUnit =
+    paneKind === 'design' ? unitFromDeviceProfile(deviceProfile) : unitFromPlatform(paneKind);
+  const rulerScale = deriveRulerScale(image.width, deviceProfile, rulerUnit);
   const isManualActive = manualMode === 'drawing' || (manualMode === 'editing' && manualDraftRect);
 
   return (
@@ -281,6 +313,9 @@ function ImagePane({
             <RulerOverlay
               imageNaturalWidth={image.width}
               imageNaturalHeight={image.height}
+              unit={rulerScale.unit}
+              unitScale={rulerScale.scale}
+              scaleLabel={rulerScale.scaleLabel}
             />
           )}
 

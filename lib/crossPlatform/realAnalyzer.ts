@@ -106,10 +106,32 @@ export class RealCrossPlatformAnalyzer implements CrossPlatformAnalyzer {
         secondaryClient.invoke(invokeArgs),
       ]);
 
+      // 排查日志：双模型两路都打出来
+      // eslint-disable-next-line no-console
+      console.log(
+        `[cross-platform] primary(${this.opts.provider}/${this.opts.model ?? '(default)'}): ${
+          primaryRes.status === 'fulfilled'
+            ? `OK len=${primaryRes.value.text.length}\n---P BEGIN---\n${primaryRes.value.text}\n---P END---`
+            : `REJECTED: ${primaryRes.reason instanceof Error ? primaryRes.reason.message : String(primaryRes.reason)}`
+        }`,
+      );
+      // eslint-disable-next-line no-console
+      console.log(
+        `[cross-platform] secondary(${this.opts.secondary.provider}/${this.opts.secondary.model ?? '(default)'}): ${
+          secondaryRes.status === 'fulfilled'
+            ? `OK len=${secondaryRes.value.text.length}\n---S BEGIN---\n${secondaryRes.value.text}\n---S END---`
+            : `REJECTED: ${secondaryRes.reason instanceof Error ? secondaryRes.reason.message : String(secondaryRes.reason)}`
+        }`,
+      );
+
       const primaryParsed =
         primaryRes.status === 'fulfilled' ? tryParse(primaryRes.value.text) : null;
       const secondaryParsed =
         secondaryRes.status === 'fulfilled' ? tryParse(secondaryRes.value.text) : null;
+      // eslint-disable-next-line no-console
+      console.log(
+        `[cross-platform] parsed: primary=${primaryParsed ? `issues=${primaryParsed.issues?.length ?? 0}` : 'null'} secondary=${secondaryParsed ? `issues=${secondaryParsed.issues?.length ?? 0}` : 'null'}`,
+      );
 
       if (!primaryParsed && !secondaryParsed) {
         const errMsgs = [
@@ -140,8 +162,17 @@ export class RealCrossPlatformAnalyzer implements CrossPlatformAnalyzer {
     } else {
       // 单模型
       const response = await primaryClient.invoke(invokeArgs);
+      // 排查用日志：不裁剪 raw，看清 GPT-5 系列到底返回啥
+      // eslint-disable-next-line no-console
+      console.log(
+        `[cross-platform] provider=${this.opts.provider} model=${this.opts.model ?? '(default)'} rawLen=${response.text.length}\n---RAW BEGIN---\n${response.text}\n---RAW END---`,
+      );
       const parsed = parseVisionJson(response.text);
       issues = normalizeIssues(parsed.issues ?? [], { hasIos, hasAndroid });
+      // eslint-disable-next-line no-console
+      console.log(
+        `[cross-platform] parsed.issues.length=${parsed.issues?.length ?? 0} normalized=${issues.length}`,
+      );
       scores = {
         platformConsistencyScore:
           hasIos && hasAndroid ? clampInt(parsed.platformConsistencyScore ?? 0, 0, 100) : 0,

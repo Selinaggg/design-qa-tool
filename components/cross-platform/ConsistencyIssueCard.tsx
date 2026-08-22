@@ -414,20 +414,18 @@ function NumberedCircle({ index, color }: { index: number; color?: string }) {
 }
 
 function CompactRow({ label, text, highlight }: { label: string; text: string; highlight?: boolean }) {
+  // 说明：这个组件出现在卡片「展开」后的区域（Collapse open={true} 里），
+  // 用户主动点开就是为了看全文。旧实现用 -webkit-line-clamp:3 硬截 3 行，
+  // 展开卡片依然看不全「描述/建议」（末尾出现 "…"），与展开交互语义冲突。
+  // 因此这里直接完整显示；靠 break-words + leading-relaxed 保证长文本可读。
   return (
     <div className={`rounded-md px-2.5 py-1.5 ${highlight ? 'bg-blue-50' : 'bg-slate-50'}`}>
-      <span className={`text-[11px] font-semibold mr-1.5 ${highlight ? 'text-blue-500' : 'text-slate-400'}`}>
+      <span
+        className={`text-[11px] font-semibold mr-1.5 ${highlight ? 'text-blue-500' : 'text-slate-400'}`}
+      >
         {label}
       </span>
-      <span
-        className="text-xs text-slate-700 leading-relaxed break-words"
-        style={{
-          display: '-webkit-box',
-           WebkitLineClamp: 3,
-          WebkitBoxOrient: 'vertical',
-          overflow: 'hidden',
-        }}
-      >
+      <span className="text-xs text-slate-700 leading-relaxed break-words whitespace-pre-wrap">
         {text}
       </span>
     </div>

@@ -1,4 +1,5 @@
 import type { VisionClient, VisionRequest, VisionResponse } from './types';
+import { requestJsonWithRetry } from './http';
 
 const OPENAI_MODEL = 'gpt-4o';
 const API_URL = 'https://api.openai.com/v1/chat/completions';
@@ -34,33 +35,41 @@ export class OpenAIVisionClient implements VisionClient {
     }
     userContent.push({ type: 'text', text: req.userPrompt });
 
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json',
+    const result = await requestJsonWithRetry<OpenAIResponse>(
+      API_URL,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: OPENAI_MODEL,
+          max_tokens: req.maxTokens ?? 4096,
+          // JSON 模式：模型必须返回合法 JSON
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: req.systemPrompt },
+            { role: 'user', content: userContent },
+          ],
+        }),
       },
-      body: JSON.stringify({
-        model: OPENAI_MODEL,
-        max_tokens: req.maxTokens ?? 4096,
-        // JSON 模式：模型必须返回合法 JSON
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: req.systemPrompt },
-          { role: 'user', content: userContent },
-        ],
-      }),
-    });
+      { label: 'OpenAI' },
+    );
 
-    const data = (await res.json()) as OpenAIResponse;
-
-    if (!res.ok) {
-      throw new Error(`OpenAI API error (${res.status}): ${data.error?.message ?? 'unknown'}`);
+    if (!result.ok || !result.json) {
+      // 优先级：结构化 error.message > raw body > parseError 兜底
+      const reason =
+        result.json?.error?.message ??
+        (result.raw ? result.raw.slice(0, 400) : undefined) ??
+        result.parseError ??
+        'unknown';
+      throw new Error(`OpenAI API error (HTTP ${result.status}): ${reason}`);
     }
 
-    const text = data.choices?.[0]?.message?.content?.trim();
+    const text = result.json.choices?.[0]?.message?.content?.trim();
     if (!text) {
-      throw new Error('OpenAI API returned empty content');
+      throw new Error(`OpenAI API returned empty content；原始响应：${result.raw.slice(0, 300)}`);
     }
 
     return { text, model: OPENAI_MODEL };

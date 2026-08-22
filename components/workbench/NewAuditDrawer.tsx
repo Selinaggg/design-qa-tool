@@ -32,8 +32,14 @@ import {
   saveAIConfig,
   maskApiKey,
   canReuseKeyBetween,
+  defaultModelFor,
+  isModelValidFor,
   MAAS_DIRECT_MODELS,
   DEFAULT_MAAS_DIRECT_MODEL,
+  MAAS_OPENAI_MODELS,
+  DEFAULT_MAAS_OPENAI_MODEL,
+  MAAS_DOUBAO_MODELS,
+  DEFAULT_MAAS_DOUBAO_MODEL,
   type AIConfig,
   type AIProviderKind,
   type RealAIProviderKind,
@@ -819,13 +825,17 @@ function AIConfigPanel() {
     saveAIConfig(empty);
   };
 
-  /** 切换 provider 时，若切到 maas-direct 且没有 model，则填默认 */
+  /**
+   * 切换 provider 时，若原 model 不属于新 provider 的支持列表，自动重置为新 provider 的默认 model。
+   * 修 bug：之前 maas-direct 分支写的是 `c.model || DEFAULT_...`，会把 `GPT-5.6 Sol`（属 maas-openai）
+   * 当 truthy 直接留下，接着送到 DirectLLM 网关触发 brpc 400 unsupported model。
+   * 现在三个 MaaS 分支统一走 isModelValidFor 校验，一致行为，避免类似坑。
+   */
   const handleProviderChange = (p: AIProviderKind) => {
     setCfg((c) => {
-      if (p === 'maas-direct') {
-        return { ...c, provider: p, model: c.model || DEFAULT_MAAS_DIRECT_MODEL };
-      }
-      return { ...c, provider: p };
+      const currentValid = isModelValidFor(p, c.model);
+      const nextModel = currentValid ? c.model : defaultModelFor(p);
+      return { ...c, provider: p, model: nextModel };
     });
   };
 
@@ -835,10 +845,16 @@ function AIConfigPanel() {
     openai: 'OpenAI (GPT-4o)',
     maas: 'MaaS Claude (Bedrock)',
     'maas-direct': 'MaaS DirectLLM (Qwen 等)',
+    'maas-openai': 'MaaS OpenAI (GPT-5.6 Sol)',
+    'maas-doubao': 'MaaS 豆包 (Doubao-Seed-2.1-Pro)',
   };
 
   /** provider 是否需要 token 而不是 API key */
-  const isTokenProvider = cfg.provider === 'maas' || cfg.provider === 'maas-direct';
+  const isTokenProvider =
+    cfg.provider === 'maas' ||
+    cfg.provider === 'maas-direct' ||
+    cfg.provider === 'maas-openai' ||
+    cfg.provider === 'maas-doubao';
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white overflow-hidden flex-shrink-0 w-full">
@@ -880,7 +896,7 @@ function AIConfigPanel() {
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-medium text-slate-600">Provider</label>
             <div className="flex items-center gap-2 flex-wrap">
-              {(['mock', 'claude', 'openai', 'maas', 'maas-direct'] as const).map((p) => (
+              {(['mock', 'claude', 'openai', 'maas', 'maas-direct', 'maas-openai', 'maas-doubao'] as const).map((p) => (
                 <button
                   key={p}
                   type="button"
@@ -897,16 +913,30 @@ function AIConfigPanel() {
             </div>
           </div>
 
-          {/* 模型选择（仅 maas-direct） */}
-          {cfg.provider === 'maas-direct' && (
+          {/* 模型选择（maas-direct / maas-openai / maas-doubao）*/}
+          {(cfg.provider === 'maas-direct' ||
+            cfg.provider === 'maas-openai' ||
+            cfg.provider === 'maas-doubao') && (
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-slate-600">模型</label>
               <select
-                value={cfg.model || DEFAULT_MAAS_DIRECT_MODEL}
+                value={
+                  cfg.model ||
+                  (cfg.provider === 'maas-direct'
+                    ? DEFAULT_MAAS_DIRECT_MODEL
+                    : cfg.provider === 'maas-openai'
+                      ? DEFAULT_MAAS_OPENAI_MODEL
+                      : DEFAULT_MAAS_DOUBAO_MODEL)
+                }
                 onChange={(e) => setCfg((c) => ({ ...c, model: e.target.value }))}
                 className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition-all"
               >
-                {MAAS_DIRECT_MODELS.map((m) => (
+                {(cfg.provider === 'maas-direct'
+                  ? MAAS_DIRECT_MODELS
+                  : cfg.provider === 'maas-openai'
+                    ? MAAS_OPENAI_MODELS
+                    : MAAS_DOUBAO_MODELS
+                ).map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.label}
                     {m.hint ? ` — ${m.hint}` : ''}
@@ -914,7 +944,22 @@ function AIConfigPanel() {
                 ))}
               </select>
               <p className="text-[11px] text-slate-400 leading-relaxed">
-                走 <code className="font-mono">maas.devops.xiaohongshu.com/v1</code>（OpenAI 兼容）；同一 QST token 支持多模型。
+                {cfg.provider === 'maas-direct' ? (
+                  <>
+                    走 <code className="font-mono">maas.devops.xiaohongshu.com/v1</code>
+                    （OpenAI 兼容）；同一 QST token 支持多模型。
+                  </>
+                ) : cfg.provider === 'maas-openai' ? (
+                  <>
+                    走 <code className="font-mono">maas.devops.rednote.life/openai/openai/chat/completions</code>
+                    （Azure OpenAI 风格，认证走 <code className="font-mono">api-key</code> 头）；与其他 MaaS 网关共用同一 QST token。
+                  </>
+                ) : (
+                  <>
+                    走 <code className="font-mono">maas.devops.xiaohongshu.com/openai/openai/doubao/chat/completions</code>
+                    （字节豆包，OpenAI 兼容，认证走 <code className="font-mono">api-key</code> 头）；与其他 MaaS 网关共用同一 QST token。
+                  </>
+                )}
               </p>
             </div>
           )}
@@ -1023,35 +1068,52 @@ function SecondaryModelConfig({ cfg, setCfg }: SecondaryModelConfigProps) {
     openai: 'OpenAI',
     maas: 'MaaS Claude',
     'maas-direct': 'MaaS DirectLLM',
+    'maas-openai': 'MaaS OpenAI',
+    'maas-doubao': 'MaaS 豆包',
+  };
+
+  const suggestSecondary = (mainProvider: AIProviderKind): RealAIProviderKind => {
+    // 建议一个跟主不同家的副 provider（MaaS 家族内互推 → 豆包做默认副选，字节多模态视角互补）
+    if (mainProvider === 'maas') return 'maas-doubao';
+    if (mainProvider === 'maas-direct') return 'maas-doubao';
+    if (mainProvider === 'maas-openai') return 'maas-doubao';
+    if (mainProvider === 'maas-doubao') return 'maas-openai';
+    return 'maas-doubao';
+  };
+
+  const defaultModelFor = (p: RealAIProviderKind): string | undefined => {
+    if (p === 'maas-direct') return DEFAULT_MAAS_DIRECT_MODEL;
+    if (p === 'maas-openai') return DEFAULT_MAAS_OPENAI_MODEL;
+    if (p === 'maas-doubao') return DEFAULT_MAAS_DOUBAO_MODEL;
+    return undefined;
   };
 
   const handleToggle = () => {
     setCfg((c) => {
       // 开启时若还没设过副 provider，默认给个跟主不同家的建议
       if (!c.enableMultiModel) {
-        const suggested: RealAIProviderKind =
-          c.provider === 'maas' ? 'maas-direct' : c.provider === 'maas-direct' ? 'maas' : 'maas-direct';
+        const suggested: RealAIProviderKind = c.secondaryProvider || suggestSecondary(c.provider);
         return {
           ...c,
           enableMultiModel: true,
-          secondaryProvider: c.secondaryProvider || suggested,
-          secondaryModel:
-            c.secondaryModel ||
-            ((c.secondaryProvider || suggested) === 'maas-direct'
-              ? DEFAULT_MAAS_DIRECT_MODEL
-              : undefined),
+          secondaryProvider: suggested,
+          secondaryModel: c.secondaryModel || defaultModelFor(suggested),
         };
       }
       return { ...c, enableMultiModel: false };
     });
   };
 
+  /**
+   * 副 provider 切换 —— 与主 provider 同样的策略：
+   * 原 model 不属于新 provider 就自动重置为该 provider 的默认，避免错配触发网关 400。
+   */
   const handleSecondaryProviderChange = (p: RealAIProviderKind) => {
-    setCfg((c) => ({
-      ...c,
-      secondaryProvider: p,
-      secondaryModel: p === 'maas-direct' ? c.secondaryModel || DEFAULT_MAAS_DIRECT_MODEL : undefined,
-    }));
+    setCfg((c) => {
+      const currentValid = isModelValidFor(p, c.secondaryModel);
+      const nextModel = currentValid ? c.secondaryModel : defaultModelFor(p);
+      return { ...c, secondaryProvider: p, secondaryModel: nextModel };
+    });
   };
 
   const canReuseMain =
@@ -1085,7 +1147,7 @@ function SecondaryModelConfig({ cfg, setCfg }: SecondaryModelConfigProps) {
           <div className="flex flex-col gap-1">
             <label className="text-[11px] font-medium text-slate-500">副 Provider</label>
             <div className="flex items-center gap-1.5 flex-wrap">
-              {(['claude', 'openai', 'maas', 'maas-direct'] as const).map((p) => (
+              {(['claude', 'openai', 'maas', 'maas-direct', 'maas-openai'] as const).map((p) => (
                 <button
                   key={p}
                   type="button"
@@ -1102,16 +1164,25 @@ function SecondaryModelConfig({ cfg, setCfg }: SecondaryModelConfigProps) {
             </div>
           </div>
 
-          {/* 副模型（仅 maas-direct） */}
-          {cfg.secondaryProvider === 'maas-direct' && (
+          {/* 副模型（maas-direct / maas-openai） */}
+          {(cfg.secondaryProvider === 'maas-direct' ||
+            cfg.secondaryProvider === 'maas-openai') && (
             <div className="flex flex-col gap-1">
               <label className="text-[11px] font-medium text-slate-500">副模型</label>
               <select
-                value={cfg.secondaryModel || DEFAULT_MAAS_DIRECT_MODEL}
+                value={
+                  cfg.secondaryModel ||
+                  (cfg.secondaryProvider === 'maas-direct'
+                    ? DEFAULT_MAAS_DIRECT_MODEL
+                    : DEFAULT_MAAS_OPENAI_MODEL)
+                }
                 onChange={(e) => setCfg((c) => ({ ...c, secondaryModel: e.target.value }))}
                 className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-100"
               >
-                {MAAS_DIRECT_MODELS.map((m) => (
+                {(cfg.secondaryProvider === 'maas-direct'
+                  ? MAAS_DIRECT_MODELS
+                  : MAAS_OPENAI_MODELS
+                ).map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.label}
                     {m.hint ? ` — ${m.hint}` : ''}
@@ -1125,7 +1196,7 @@ function SecondaryModelConfig({ cfg, setCfg }: SecondaryModelConfigProps) {
           {cfg.secondaryProvider && (
             <div className="flex flex-col gap-1">
               <label className="text-[11px] font-medium text-slate-500">
-                副 {cfg.secondaryProvider === 'maas' || cfg.secondaryProvider === 'maas-direct' ? 'Token' : 'API Key'}
+                副 {cfg.secondaryProvider === 'maas' || cfg.secondaryProvider === 'maas-direct' || cfg.secondaryProvider === 'maas-openai' ? 'Token' : 'API Key'}
                 {canReuseMain && (
                   <span className="text-slate-400 font-normal ml-1">（同家 provider 可留空复用主 key）</span>
                 )}

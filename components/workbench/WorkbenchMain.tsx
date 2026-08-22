@@ -551,6 +551,8 @@ function CrossPlatformWorkbench({
               designImage={ctx?.designImage ?? null}
               iosDeviceName={session.iosDevice?.name ?? 'iOS'}
               androidDeviceName={session.androidDevice?.name ?? 'Android'}
+              iosDevice={session.iosDevice ?? null}
+              androidDevice={session.androidDevice ?? null}
               iosRegions={iosRegions}
               androidRegions={androidRegions}
               highlightedRegionName={highlightedRegionName ?? listHoverName}
@@ -614,6 +616,8 @@ function CrossPlatformWorkbench({
               designImage={ctx?.designImage ?? null}
               iosDeviceName={session.iosDevice?.name ?? 'iOS'}
               androidDeviceName={session.androidDevice?.name ?? 'Android'}
+              iosDevice={session.iosDevice ?? null}
+              androidDevice={session.androidDevice ?? null}
               iosRegions={iosRegions}
               androidRegions={androidRegions}
               highlightedRegionName={highlightedRegionName ?? listHoverName}

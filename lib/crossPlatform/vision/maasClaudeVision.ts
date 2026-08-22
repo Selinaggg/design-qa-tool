@@ -53,35 +53,58 @@ export class MaasClaudeVisionClient implements VisionClient {
     }
     content.push({ type: 'text', text: req.userPrompt });
 
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        token: this.token,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: MAAS_MODEL,
-        anthropic_version: ANTHROPIC_VERSION,
-        max_tokens: req.maxTokens ?? 4096,
-        system: req.systemPrompt,
-        messages: [{ role: 'user', content }],
-      }),
+    const requestBody = JSON.stringify({
+      model: MAAS_MODEL,
+      anthropic_version: ANTHROPIC_VERSION,
+      max_tokens: req.maxTokens ?? 4096,
+      system: req.systemPrompt,
+      messages: [{ role: 'user', content }],
     });
 
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '<no body>');
-      throw new Error(`MaaS API error (${res.status}): ${errText.slice(0, 500)}`);
-    }
-    if (!res.body) {
-      throw new Error('MaaS API returned no response body.');
+    // 瞬时错误（5xx / brpc / 网络抖动）自动重试；流式响应必须整帧拿到才算成功
+    const maxAttempts = 3;
+    let lastErr = '';
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          token: this.token,
+          'Content-Type': 'application/json',
+        },
+        body: requestBody,
+      });
+
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '<no body>');
+        const transient =
+          res.status >= 500 ||
+          res.status === 429 ||
+          /brpc|timeout|timed out|eof|unavailable|try again/i.test(errText);
+        if (transient && attempt < maxAttempts) {
+          // eslint-disable-next-line no-console
+          console.warn(
+            `[MaaS Claude] 瞬时错误 (HTTP ${res.status})，第 ${attempt}/${maxAttempts} 次重试；body: ${errText.slice(0, 120)}`,
+          );
+          lastErr = errText;
+          await new Promise((r) => setTimeout(r, 800 * attempt));
+          continue;
+        }
+        throw new Error(`MaaS Claude API error (HTTP ${res.status}): ${errText.slice(0, 500)}`);
+      }
+      if (!res.body) {
+        throw new Error('MaaS Claude API returned no response body.');
+      }
+
+      const fullText = await parseStreamToText(res.body);
+      if (!fullText) {
+        throw new Error('MaaS Claude API returned empty text after stream parse.');
+      }
+      return { text: fullText, model: MAAS_MODEL };
     }
 
-    const fullText = await parseStreamToText(res.body);
-    if (!fullText) {
-      throw new Error('MaaS API returned empty text after stream parse.');
-    }
-
-    return { text: fullText, model: MAAS_MODEL };
+    throw new Error(
+      `MaaS Claude API error（已重试 ${maxAttempts} 次）：${lastErr.slice(0, 300)}`,
+    );
   }
 }
 
