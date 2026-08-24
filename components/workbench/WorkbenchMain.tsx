@@ -784,11 +784,11 @@ function WorkbenchToolBar({
     : undefined;
 
   // 分隔线
-  const TBDivider = () => <div className="w-px h-4 bg-slate-200 flex-shrink-0 mx-0.5" />;
+  const TBDivider = () => <div className="w-px h-3 bg-slate-200 flex-shrink-0 mx-0.5" />;
 
   // 统一按钮样式 helper
   const tbBtn = (active: boolean, danger = false) =>
-    `flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+    `flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
       active
         ? danger
           ? 'bg-amber-500 text-white'
@@ -819,7 +819,7 @@ function WorkbenchToolBar({
               label: '并排',
               tooltip: 'iOS 与 Android 截图左右对比',
               icon: (
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                     d="M4 6h7M4 12h7M4 18h7M13 6h7M13 12h7M13 18h7" />
                 </svg>
@@ -832,7 +832,7 @@ function WorkbenchToolBar({
               disabled: !hasDesignRef,
               disabledTitle: '请先上传设计稿',
               icon: (
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                     d="M8 9l-4 3 4 3M16 9l4 3-4 3M12 3v18" />
                 </svg>
@@ -843,7 +843,7 @@ function WorkbenchToolBar({
               label: '标注',
               tooltip: '在截图上标注关注区域',
               icon: (
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                     d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                 </svg>
@@ -856,7 +856,7 @@ function WorkbenchToolBar({
             type="button"
             disabled={isManualActive || disabled}
             onClick={() => !isManualActive && !disabled && onViewModeChange(id)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
               isManualActive || disabled
                 ? 'text-slate-300 cursor-not-allowed'
                 : viewMode === id
@@ -880,7 +880,7 @@ function WorkbenchToolBar({
               key={p}
               type="button"
               onClick={() => onSliderTargetChange(p)}
-              className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              className={`px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
                 sliderTarget === p ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'
               }`}
             >
@@ -901,7 +901,7 @@ function WorkbenchToolBar({
             onClick={() => onShowRulersChange(!showRulers)}
             className={tbBtn(showRulers)}
           >
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor"
               strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="8" width="18" height="8" rx="1" />
               <path d="M8 8v3M12 8v4M16 8v3" />
@@ -915,7 +915,7 @@ function WorkbenchToolBar({
             onClick={() => onClearScreenChange(!clearScreen)}
             className={tbBtn(clearScreen, true)}
           >
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor"
               strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
               {clearScreen ? (
                 <>
@@ -947,7 +947,7 @@ function WorkbenchToolBar({
         type="button"
         onClick={onStartManual}
         disabled={isManualActive}
-        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+        className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
           manualMode === 'drawing'
             ? 'bg-purple-600 text-white'
             : manualMode === 'editing'
@@ -955,7 +955,7 @@ function WorkbenchToolBar({
               : 'text-slate-600 hover:bg-slate-100'
         } disabled:opacity-50 disabled:cursor-not-allowed`}
       >
-        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
             d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
         </svg>
@@ -973,7 +973,7 @@ function WorkbenchToolBar({
         onClick={onRunAudit}
         disabled={!canRun || auditing || disabledByOther}
         title={disabledByOther ? '批量执行进行中，请等待完成' : runBtnTitle}
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+        className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors ${
           !canRun || auditing || disabledByOther
             ? 'text-slate-300 cursor-not-allowed'
             : hasResult
@@ -983,7 +983,7 @@ function WorkbenchToolBar({
       >
         {auditing ? (
           <>
-            <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+            <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
             </svg>
@@ -1022,19 +1022,19 @@ function VersionSwitcher({
   };
 
   return (
-    <div className="relative flex items-center gap-1 rounded-lg border border-slate-200 bg-white/95 backdrop-blur p-1 shadow-sm">
+    <div className="relative flex items-center gap-0.5 rounded-lg border border-slate-200 bg-white/95 backdrop-blur p-0.5 shadow-sm">
       {/* 当前版本按钮（点击下拉） */}
       <button
         ref={triggerRef}
         type="button"
         onClick={handleToggle}
-        className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
+        className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
       >
-        <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-blue-100 text-blue-700 text-[10px] font-bold">
+        <span className="inline-flex items-center justify-center w-4 h-4 rounded bg-blue-100 text-blue-700 text-[9px] font-bold">
           v{cur.v}
         </span>
         <span>{session.versions.length > 1 ? '当前版本' : '仅一版'}</span>
-        <svg className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`}
+        <svg className={`w-2.5 h-2.5 transition-transform ${open ? 'rotate-180' : ''}`}
           fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
@@ -1046,9 +1046,9 @@ function VersionSwitcher({
         type="button"
         onClick={onAddVersion}
         disabled={!canAdd}
-        className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors"
+        className="flex items-center gap-0.5 px-1.5 py-1 rounded-md text-[11px] font-medium text-slate-600 hover:bg-slate-100 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors"
       >
-        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
         </svg>
         新版本
@@ -1061,9 +1061,9 @@ function VersionSwitcher({
         type="button"
         onClick={onOpenDiff}
         disabled={!canDiff}
-        className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors"
+        className="flex items-center gap-0.5 px-1.5 py-1 rounded-md text-[11px] font-medium text-slate-600 hover:bg-slate-100 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors"
       >
-        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
             d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
         </svg>

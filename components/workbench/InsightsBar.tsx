@@ -172,7 +172,7 @@ export function ExportDropdown({ session, disabled }: { session: AuditSession; d
         type="button"
         disabled={disabled || pdfLoading}
         onClick={handleToggle}
-        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+        className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
           disabled || pdfLoading
             ? 'text-slate-300 cursor-not-allowed'
             : 'text-slate-600 hover:bg-slate-100 cursor-pointer'
@@ -181,7 +181,7 @@ export function ExportDropdown({ session, disabled }: { session: AuditSession; d
       >
         {pdfLoading ? (
           <>
-            <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+            <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
             </svg>
@@ -189,12 +189,12 @@ export function ExportDropdown({ session, disabled }: { session: AuditSession; d
           </>
         ) : (
           <>
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
                 d="M12 16v-8m0 8l-3-3m3 3l3-3M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
             导出报告
-            <svg className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`}
+            <svg className={`w-2.5 h-2.5 transition-transform ${open ? 'rotate-180' : ''}`}
               fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
