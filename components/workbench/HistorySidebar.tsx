@@ -135,7 +135,7 @@ export default function HistorySidebar({
 
   // ── 展开态：220px 完整列表 ────────────────────────────────
   return (
-    <aside className="w-[220px] flex-shrink-0 flex flex-col material-thick border-r border-slate-200/60">
+    <aside className="w-[180px] flex-shrink-0 flex flex-col material-thick border-r border-slate-200/60">
       {/* Header + New button */}
       <div className="flex flex-col gap-3 p-4 border-b border-slate-100">
         <div className="flex items-center justify-between gap-2">
