@@ -43,25 +43,31 @@ export default function HistorySidebar({
 }: HistorySidebarProps) {
   // 每个会话的用户手动展开态；未设置的多版本 active 会话默认展开
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  // 侧栏折叠态：从 localStorage 读取，默认展开
-  const [collapsed, setCollapsed] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    try {
-      return window.localStorage.getItem(COLLAPSED_KEY) === '1';
-    } catch {
-      return false;
-    }
-  });
+  // 侧栏折叠态：SSR 时统一为 false（展开态），mount 后再从 localStorage 恢复，避免 hydration mismatch
+  const [collapsed, setCollapsed] = useState<boolean>(false);
+  const [hydrated, setHydrated] = useState(false);
 
-  // 折叠态持久化
+  // 挂载后从 localStorage 读取真实态
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    try {
+      if (window.localStorage.getItem(COLLAPSED_KEY) === '1') {
+        setCollapsed(true);
+      }
+    } catch {
+      /* ignore disabled storage */
+    }
+    setHydrated(true);
+  }, []);
+
+  // 折叠态持久化（hydrate 完成后才写，避免覆盖初始值）
+  useEffect(() => {
+    if (!hydrated) return;
     try {
       window.localStorage.setItem(COLLAPSED_KEY, collapsed ? '1' : '0');
     } catch {
       /* ignore quota / disabled storage */
     }
-  }, [collapsed]);
+  }, [collapsed, hydrated]);
 
   /** 派生：某会话是否应该展开 —— 用户手动设置优先，否则 active 且多版本时默认展开 */
   const isExpanded = (s: AuditSession): boolean => {
