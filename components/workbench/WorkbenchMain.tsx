@@ -640,7 +640,7 @@ function CrossPlatformWorkbench({
         subtitle={
           effectiveViewMode === 'annotate'
             ? '在图上拖动框选区域，可输入名称；相同名称自动配对参与走查'
-            : '切换到「标注」模式可在图上直接框选；相同名称的区域会自动配对比较'
+            : '切换到「划区」模式可在图上直接框选；相同名称的区域会自动配对比较'
         }
       >
         <AnnotationStep
@@ -840,12 +840,22 @@ function WorkbenchToolBar({
             },
             {
               id: 'annotate' as ViewMode,
-              label: '标注',
-              tooltip: '在截图上标注关注区域',
+              label: '划区',
+              tooltip: '框选关注区域，供 AI 走查聚焦对比',
               icon: (
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                // 虚线四角选框：四个 L 形角 + 虚线边
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                  strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  {/* 四个角 */}
+                  <path d="M4 8V5a1 1 0 011-1h3" />
+                  <path d="M16 4h3a1 1 0 011 1v3" />
+                  <path d="M20 16v3a1 1 0 01-1 1h-3" />
+                  <path d="M8 20H5a1 1 0 01-1-1v-3" />
+                  {/* 虚线边（四条边中间段） */}
+                  <path d="M10 4h4" strokeDasharray="2 2" />
+                  <path d="M20 10v4" strokeDasharray="2 2" />
+                  <path d="M14 20h-4" strokeDasharray="2 2" />
+                  <path d="M4 14v-4" strokeDasharray="2 2" />
                 </svg>
               ),
             },
@@ -1179,12 +1189,19 @@ function ViewModeBar({
         onClick={() => handle('annotate')}
         disabled={disabled}
         icon={
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 8V5a1 1 0 011-1h3" />
+            <path d="M16 4h3a1 1 0 011 1v3" />
+            <path d="M20 16v3a1 1 0 01-1 1h-3" />
+            <path d="M8 20H5a1 1 0 01-1-1v-3" />
+            <path d="M10 4h4" strokeDasharray="2 2" />
+            <path d="M20 10v4" strokeDasharray="2 2" />
+            <path d="M14 20h-4" strokeDasharray="2 2" />
+            <path d="M4 14v-4" strokeDasharray="2 2" />
           </svg>
         }
-        label="标注"
+        label="划区"
       />
     </div>
     </TBTooltip>
