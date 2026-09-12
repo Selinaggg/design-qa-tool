@@ -5,7 +5,6 @@ import { Collapse } from '@/components/ui/Collapse';
 import type {
   PlatformConsistencyIssue,
   IssueType,
-  IssueSeverityCP,
   IssueStatusCP,
   PlatformType,
 } from '@/lib/crossPlatform';
@@ -38,21 +37,6 @@ interface ConsistencyIssueCardProps {
   onDelete?: () => void;
 }
 
-const severityStyle: Record<IssueSeverityCP, string> = {
-  critical: 'bg-red-100 text-red-700 ring-1 ring-red-200',
-  high:     'bg-orange-100 text-orange-700 ring-1 ring-orange-200',
-  medium:   'bg-yellow-100 text-yellow-700 ring-1 ring-yellow-200',
-  low:      'bg-slate-100 text-slate-600 ring-1 ring-slate-200',
-};
-
-const typeStyle: Record<IssueType, string> = {
-  content:           'bg-purple-50 text-purple-700',
-  layout:            'bg-blue-50 text-blue-700',
-  style:             'bg-green-50 text-green-700',
-  interaction:       'bg-indigo-50 text-indigo-700',
-  'platform-specific': 'bg-slate-100 text-slate-600',
-};
-
 const typeLabel: Record<IssueType, string> = {
   content:           '内容',
   layout:            '布局',
@@ -68,9 +52,9 @@ const platformLabel: Record<PlatformType, string> = {
 };
 
 const platformBadge: Record<PlatformType, string> = {
-  ios:     'bg-blue-500 text-white',
-  android: 'bg-green-500 text-white',
-  web:     'bg-slate-500 text-white',
+  ios:     'bg-blue-50 text-blue-700',
+  android: 'bg-emerald-50 text-emerald-700',
+  web:     'bg-slate-100 text-slate-600',
 };
 
 const STATUS_LABEL: Record<IssueStatusCP, string> = {
@@ -82,9 +66,9 @@ const STATUS_LABEL: Record<IssueStatusCP, string> = {
 
 const STATUS_STYLE: Record<IssueStatusCP, string> = {
   pending: 'bg-slate-100 text-slate-600',
-  deferred: 'bg-amber-50 text-amber-700 border border-amber-200',
-  ignored: 'bg-slate-50 text-slate-400 border border-slate-200',
-  fixed: 'bg-green-50 text-green-700 border border-green-200',
+  deferred: 'bg-amber-50 text-amber-700',
+  ignored: 'bg-slate-50 text-slate-400',
+  fixed: 'bg-emerald-50 text-emerald-700',
 };
 
 const ConsistencyIssueCard = forwardRef<HTMLDivElement, ConsistencyIssueCardProps>(function ConsistencyIssueCard(
@@ -120,51 +104,25 @@ const ConsistencyIssueCard = forwardRef<HTMLDivElement, ConsistencyIssueCardProp
       ref={ref}
       className={`border rounded-xl overflow-hidden bg-white transition-all ${
         isHighlighted
-          ? 'border-blue-400 ring-2 ring-blue-100 shadow-float'
+          ? 'border-blue-300 ring-2 ring-blue-100/80 shadow-chip'
           : issue.isAcceptablePlatformDifference
-            ? 'border-slate-200 opacity-80'
-            : 'border-slate-200'
+            ? 'border-slate-200/80 opacity-80'
+            : 'border-slate-200/80 shadow-chip'
       }`}
     >
       <button
         onClick={() => toggle()}
-        className="w-full flex flex-col gap-2 px-3 py-3 text-left hover:bg-slate-50 transition-colors"
+        className="w-full flex flex-col gap-3 px-4 pt-4 pb-3 text-left hover:bg-slate-50/70 transition-colors"
       >
-        {/* Row 1: numbered circle + badges + status + chevron */}
+        {/* Row 1: numbered circle + status + platforms + chevron */}
         <div className="flex items-center gap-1.5 w-full flex-wrap">
           <NumberedCircle index={index} color={toneColor} />
-          {versionStatus === 'new' && (
-            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 ring-1 ring-rose-200 flex-shrink-0" title="本版新增">
-              🆕 新增
-            </span>
-          )}
-          {versionStatus === 'persist' && (
-            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 ring-1 ring-blue-200 flex-shrink-0" title="上版仍存在">
-              🔵 存续
-            </span>
-          )}
-          {issue.manual && (
-            <span
-              className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 ring-1 ring-purple-200 flex-shrink-0"
-              title="手工标注（非 AI 检测）"
-            >
-              📝 手工
-            </span>
-          )}
-          {issue.discoveredBy && (
-            <span
-              className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ring-1 flex-shrink-0 ${discoveredByStyle(issue.discoveredBy)}`}
-              title={discoveredByTitle(issue.discoveredBy)}
-            >
-              {discoveredByLabel(issue.discoveredBy)}
-            </span>
-          )}
-          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0 ${STATUS_STYLE[status]}`}>
+          <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${STATUS_STYLE[status]}`}>
             {STATUS_LABEL[status]}
           </span>
-          <div className="flex gap-0.5 flex-shrink-0">
+          <div className="flex gap-1 flex-shrink-0">
             {issue.platforms.map((p) => (
-              <span key={p} className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${platformBadge[p]}`}>
+              <span key={p} className={`text-[10px] font-medium px-2 py-0.5 rounded-md ${platformBadge[p]}`}>
                 {platformLabel[p]}
               </span>
             ))}
@@ -178,7 +136,7 @@ const ConsistencyIssueCard = forwardRef<HTMLDivElement, ConsistencyIssueCardProp
         </div>
 
         {/* Row 2: title */}
-        <p className="text-sm font-medium text-slate-800 leading-snug break-words w-full">
+        <p className="text-[15px] font-semibold text-slate-900 leading-snug break-words w-full">
           {issue.title}
           {issue.isAcceptablePlatformDifference && (
             <span className="ml-2 text-xs font-normal text-slate-400">（平台合理差异）</span>
@@ -186,30 +144,62 @@ const ConsistencyIssueCard = forwardRef<HTMLDivElement, ConsistencyIssueCardProp
         </p>
 
         {/* Row 3: tags */}
-        {issue.tags && issue.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 w-full">
-            {issue.tags.map((tag) => (
-              <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">
+        <div className="flex flex-wrap gap-1 w-full">
+          <span className="text-[11px] px-2 py-0.5 rounded-md bg-slate-100/80 text-slate-500">
+            {typeLabel[issue.type]}
+          </span>
+          {issue.tags?.map((tag) => (
+              <span key={tag} className="text-[11px] px-2 py-0.5 rounded-md bg-slate-100/80 text-slate-500">
                 {tag}
               </span>
-            ))}
+          ))}
+        </div>
+
+        {/* Row 4: metadata */}
+        {issue.regionName && (
+          <p className="text-[11px] text-slate-400">
+            区域 <span className="ml-2 text-slate-500">{issue.regionName}</span>
+          </p>
+        )}
+
+        {/* Row 5: provenance / version context */}
+        {(versionStatus === 'new' || versionStatus === 'persist' || issue.manual || issue.discoveredBy) && (
+          <div className="flex flex-wrap gap-1.5 w-full">
+            {versionStatus === 'new' && (
+              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700" title="本版新增">
+                本版新增
+              </span>
+            )}
+            {versionStatus === 'persist' && (
+              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-500" title="上版仍存在">
+                上版存续
+              </span>
+            )}
+            {issue.manual && (
+              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-purple-50 text-purple-700" title="手工标注（非 AI 检测）">
+                手工标注
+              </span>
+            )}
+            {issue.discoveredBy && (
+              <span
+                className={`text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${discoveredByStyle(issue.discoveredBy)}`}
+                title={discoveredByTitle(issue.discoveredBy)}
+              >
+                {discoveredByLabel(issue.discoveredBy)}
+              </span>
+            )}
           </div>
         )}
       </button>
 
       <Collapse open={expanded}>
-        <div className="border-t border-slate-100 px-3 pb-3 pt-2 flex flex-col gap-1.5">
-          {issue.regionName && (
-            <p className="text-[11px] text-slate-400">
-              区域：<span className="text-slate-600 font-medium">{issue.regionName}</span>
-            </p>
-          )}
-          {issue.description && <CompactRow label="描述" text={issue.description} />}
+        <div className="px-4 pb-4 pt-1 flex flex-col gap-4">
+          {issue.description && <DetailBlock label="问题描述" text={issue.description} />}
           {issue.suggestion && !issue.isAcceptablePlatformDifference && (
-            <CompactRow label="建议" text={issue.suggestion} highlight />
+            <DetailBlock label="修复建议" text={issue.suggestion} highlight />
           )}
           {onStatusChange && (
-            <div className="flex items-center gap-1 pt-1 flex-wrap">
+            <div className="flex items-center gap-1 pt-3 border-t border-slate-100 flex-wrap">
               <span className="text-[11px] text-slate-400 mr-1">标记为：</span>
               {(['pending', 'deferred', 'ignored', 'fixed'] as IssueStatusCP[]).map((s) => (
                 <button
@@ -218,7 +208,7 @@ const ConsistencyIssueCard = forwardRef<HTMLDivElement, ConsistencyIssueCardProp
                     e.stopPropagation();
                     onStatusChange(s);
                   }}
-                  className={`text-[10px] px-2 py-0.5 rounded-full transition-colors ${
+                  className={`text-[10px] px-2 py-1 rounded-full transition-colors ${
                     status === s
                       ? STATUS_STYLE[s] + ' font-semibold'
                       : 'text-slate-500 hover:bg-slate-100'
@@ -399,13 +389,9 @@ function CropPane({
 function NumberedCircle({ index, color }: { index: number; color?: string }) {
   return (
     <span
-      className="inline-flex items-center justify-center rounded-full text-white text-[11px] font-bold flex-shrink-0"
+      className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-slate-100 text-[11px] font-semibold tabular-nums flex-shrink-0"
       style={{
-        width: 20,
-        height: 20,
-        background: color ?? '#94a3b8',
-        border: '2px solid #ffffff',
-        boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
+        color: color ?? '#64748b',
       }}
     >
       {index}
@@ -413,21 +399,19 @@ function NumberedCircle({ index, color }: { index: number; color?: string }) {
   );
 }
 
-function CompactRow({ label, text, highlight }: { label: string; text: string; highlight?: boolean }) {
+function DetailBlock({ label, text, highlight }: { label: string; text: string; highlight?: boolean }) {
   // 说明：这个组件出现在卡片「展开」后的区域（Collapse open={true} 里），
   // 用户主动点开就是为了看全文。旧实现用 -webkit-line-clamp:3 硬截 3 行，
   // 展开卡片依然看不全「描述/建议」（末尾出现 "…"），与展开交互语义冲突。
   // 因此这里直接完整显示；靠 break-words + leading-relaxed 保证长文本可读。
   return (
-    <div className={`rounded-md px-2.5 py-1.5 ${highlight ? 'bg-blue-50' : 'bg-slate-50'}`}>
-      <span
-        className={`text-[11px] font-semibold mr-1.5 ${highlight ? 'text-blue-500' : 'text-slate-400'}`}
-      >
+    <div className={highlight ? 'rounded-lg bg-blue-50/60 px-3 py-2.5' : ''}>
+      <p className={`text-[11px] font-medium mb-1.5 ${highlight ? 'text-blue-700' : 'text-slate-500'}`}>
         {label}
-      </span>
-      <span className="text-xs text-slate-700 leading-relaxed break-words whitespace-pre-wrap">
+      </p>
+      <p className="text-[13px] text-slate-700 leading-relaxed break-words whitespace-pre-wrap">
         {text}
-      </span>
+      </p>
     </div>
   );
 }
@@ -442,10 +426,8 @@ function discoveredByLabel(who: string): string {
 }
 
 function discoveredByStyle(who: string): string {
-  if (who === 'both') return 'bg-emerald-100 text-emerald-700 ring-emerald-200';
-  // 单模型发现：中性灰底 + provider 家族色
-  if (who.startsWith('maas') || who === 'openai') return 'bg-amber-50 text-amber-700 ring-amber-200';
-  return 'bg-sky-50 text-sky-700 ring-sky-200';
+  if (who === 'both') return 'bg-emerald-50 text-emerald-700';
+  return 'bg-slate-100 text-slate-500';
 }
 
 function discoveredByTitle(who: string): string {

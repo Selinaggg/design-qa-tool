@@ -46,7 +46,7 @@ export default function AppHeader() {
           </nav>
         </div>
 
-        <span className="text-xs bg-blue-50 text-blue-600 font-medium px-2.5 py-1 rounded-full border border-blue-100">
+        <span className="text-[11px] bg-slate-100 text-slate-500 font-medium px-2.5 py-1 rounded-full">
           MVP v0.1
         </span>
       </div>

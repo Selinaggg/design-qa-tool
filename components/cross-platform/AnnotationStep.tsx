@@ -35,22 +35,9 @@ export default function AnnotationStep({
   onAndroidRegionsChange,
   onHoverRegion,
 }: AnnotationStepProps) {
-  const totalRegions = iosRegions.length + androidRegions.length;
-
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500">
-          在上方画板顶部切换到「标注」模式后，直接在图上框选区域。iOS 和 Android 使用相同名称的区域会被自动配对比较。
-        </p>
-        {totalRegions > 0 && (
-          <span className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-full border border-blue-100 flex-shrink-0">
-            已标注 {totalRegions} 个区域
-          </span>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+    <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <RegionColumn
           title="iOS 截图"
           badgeColor="bg-blue-500"
@@ -67,10 +54,10 @@ export default function AnnotationStep({
         />
       </div>
 
-      {totalRegions === 0 && (
-        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-center">
+      {iosRegions.length + androidRegions.length === 0 && (
+        <div className="border-t border-dashed border-slate-200 px-4 py-4 text-center">
           <p className="text-xs text-slate-400">
-            此步骤可选 — 跳过后系统会进行默认走查；框选关注区域后，报告问题将与对应模块关联。
+            此步骤可选，跳过后系统会进行默认走查；框选关注区域后，报告问题将与对应模块关联。
           </p>
         </div>
       )}
@@ -107,7 +94,7 @@ function RegionColumn({
         <span className="text-xs text-slate-400">{regions.length} 个区域</span>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+      <div className="rounded-lg border border-slate-200/70 bg-white overflow-hidden">
         {regions.length === 0 ? (
           <div className="px-4 py-8 text-center text-xs text-slate-400">
             暂无标注区域

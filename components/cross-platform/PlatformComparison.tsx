@@ -127,7 +127,7 @@ export default function PlatformComparison({
             image={iosImage}
             label="iOS"
             sublabel={iosDeviceName}
-            badgeColor="bg-blue-500"
+            badgeColor="bg-blue-50 text-blue-700"
             regions={iosRegions}
             onRegionsChange={onIosRegionsChange}
             highlightedRegionName={highlightedRegionName}
@@ -138,7 +138,9 @@ export default function PlatformComparison({
             idPrefix="ios"
             showCoordinates={showCoordinates}
             showRulers={showRulers}
-            coordinateAccent="#2563eb"
+            coordinateAccent="#60a5fa"
+            coordinateBackground="#eff6ff"
+            coordinateTextColor="#1d4ed8"
             clearScreen={clearScreen}
             manualMode={iosManualMode}
             manualDraftRect={iosDraftRect}
@@ -155,7 +157,7 @@ export default function PlatformComparison({
             image={androidImage}
             label="Android"
             sublabel={androidDeviceName}
-            badgeColor="bg-green-500"
+            badgeColor="bg-emerald-50 text-emerald-700"
             regions={androidRegions}
             onRegionsChange={onAndroidRegionsChange}
             highlightedRegionName={highlightedRegionName}
@@ -166,7 +168,9 @@ export default function PlatformComparison({
             idPrefix="android"
             showCoordinates={showCoordinates}
             showRulers={showRulers}
-            coordinateAccent="#059669"
+            coordinateAccent="#34d399"
+            coordinateBackground="#ecfdf5"
+            coordinateTextColor="#047857"
             clearScreen={clearScreen}
             manualMode={androidManualMode}
             manualDraftRect={androidDraftRect}
@@ -183,7 +187,7 @@ export default function PlatformComparison({
             image={designImage}
             label="设计稿"
             sublabel="参考"
-            badgeColor="bg-purple-500"
+            badgeColor="bg-purple-50 text-purple-700"
             regions={[]}
             highlightedRegionName={null}
             issueBadges={designBadges}
@@ -193,7 +197,9 @@ export default function PlatformComparison({
             idPrefix="design"
             showCoordinates={showCoordinates}
             showRulers={showRulers}
-            coordinateAccent="#7c3aed"
+            coordinateAccent="#c084fc"
+            coordinateBackground="#faf5ff"
+            coordinateTextColor="#7e22ce"
             clearScreen={clearScreen}
             // 设计稿不参与手工标注
             manualMode="idle"
@@ -223,6 +229,8 @@ function ImagePane({
   showCoordinates,
   showRulers,
   coordinateAccent,
+  coordinateBackground,
+  coordinateTextColor,
   clearScreen = false,
   manualMode,
   manualDraftRect,
@@ -247,6 +255,10 @@ function ImagePane({
   showRulers?: boolean;
   /** 坐标 chip + 十字线颜色（裸色值，比如 #2563eb） */
   coordinateAccent?: string;
+  /** 坐标 chip 浅色背景 */
+  coordinateBackground?: string;
+  /** 坐标 chip 文字颜色 */
+  coordinateTextColor?: string;
   /** 清屏：隐藏所有叠加层只看原图 */
   clearScreen?: boolean;
   /** 手工标注模式 */
@@ -274,7 +286,7 @@ function ImagePane({
       {/* Header labels：跟随图片一起缩放（简单直观；缩太小时会不明显，可以适应窗口按钮） */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className={`text-white text-[10px] font-bold px-1.5 py-0.5 rounded ${badgeColor}`}>
+          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${badgeColor}`}>
             {label}
           </span>
           <span className="text-xs font-semibold text-slate-700">{sublabel}</span>
@@ -386,6 +398,8 @@ function ImagePane({
               imageNaturalWidth={image.width}
               imageNaturalHeight={image.height}
               accentColor={coordinateAccent}
+              accentBackgroundColor={coordinateBackground}
+              accentTextColor={coordinateTextColor}
             />
           )}
         </div>

@@ -24,6 +24,27 @@ function formatTime(ts: number) {
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
+function formatDate(ts: number) {
+  const d = new Date(ts);
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+function formatClock(ts: number) {
+  return new Date(ts).toLocaleTimeString('en-US');
+}
+
+function issueCountOf(session: AuditSession) {
+  const version = session.versions[session.currentVersionIndex];
+  if (!version) return 0;
+  if (version.boards?.length) {
+    return version.boards.reduce(
+      (total, board) => total + (board.crossPlatformResult?.issues.length ?? 0),
+      0,
+    );
+  }
+  return version.crossPlatformResult?.issues.length ?? 0;
+}
+
 /** 会话名首字符（用于折叠态图标） */
 function initialOf(name: string): string {
   const trimmed = name.trim();
@@ -126,7 +147,7 @@ export default function HistorySidebar({
                 aria-label={s.name}
                 className={`w-10 h-10 mx-auto flex items-center justify-center rounded-lg text-sm font-semibold transition-colors ${
                   active
-                    ? 'bg-blue-600 text-white shadow-sm'
+                    ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-100'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
@@ -141,11 +162,11 @@ export default function HistorySidebar({
 
   // ── 展开态：220px 完整列表 ────────────────────────────────
   return (
-    <aside className="w-[200px] flex-shrink-0 flex flex-col material-thick border-r border-slate-200/60">
+    <aside className="w-[208px] flex-shrink-0 flex flex-col material-thick border-r border-slate-200/60">
       {/* Header + New button */}
       <div className="flex flex-col gap-3 p-4 border-b border-slate-100">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+          <h2 className="text-sm font-semibold text-slate-800">
             走查历史
           </h2>
           <button
@@ -162,7 +183,7 @@ export default function HistorySidebar({
         </div>
         <button
           onClick={onNew}
-          className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
+          className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-blue-600 text-white text-[13px] font-medium hover:bg-blue-700 transition-colors shadow-chip"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -188,6 +209,7 @@ export default function HistorySidebar({
               const active = s.id === activeSessionId;
               const multiVersion = s.versions.length > 1;
               const isOpen = isExpanded(s);
+              const issueCount = issueCountOf(s);
               return (
                 <li key={s.id}>
                   {/* 会话行 */}
@@ -201,25 +223,15 @@ export default function HistorySidebar({
                         onSelect(s.id);
                       }
                     }}
-                    className={`group w-full text-left rounded-lg px-3 py-2.5 transition-colors flex flex-col gap-1 cursor-pointer ${
+                    className={`group w-full text-left rounded-lg px-3 py-3 transition-colors flex flex-col gap-1.5 cursor-pointer ${
                       active
-                        ? 'bg-blue-50 border border-blue-200'
-                        : 'hover:bg-slate-50 border border-transparent'
+                        ? 'bg-blue-50/80'
+                        : 'hover:bg-slate-100/70'
                     }`}
                   >
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-400">
-                        {formatTime(s.createdAt)}
-                      </span>
-                      {multiVersion && (
-                        <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 rounded px-1.5 py-0.5">
-                          {s.versions.length} 版
-                        </span>
-                      )}
-                    </div>
                     <div className="flex items-center justify-between gap-2">
-                      <span className={`text-sm font-medium truncate ${active ? 'text-blue-700' : 'text-slate-700'}`}>
-                        {s.name}
+                      <span className="text-[11px] text-slate-400 tabular-nums">
+                        {formatDate(s.createdAt)}
                       </span>
                       <div className="flex items-center gap-1 flex-shrink-0">
                         {multiVersion && (
@@ -252,6 +264,17 @@ export default function HistorySidebar({
                         </button>
                       </div>
                     </div>
+                    <div className="flex items-baseline gap-1.5 min-w-0">
+                      <span className="text-[13px] font-semibold text-slate-800 truncate">
+                        {s.name}
+                      </span>
+                      <span className="text-[10px] text-slate-400 tabular-nums flex-shrink-0">
+                        {formatClock(s.createdAt)}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 tabular-nums">
+                      {s.versions.length} 个版本 · {issueCount} 个差异
+                    </p>
                   </div>
 
                   {/* 版本子项列表（多版本且展开时显示） */}
@@ -269,12 +292,12 @@ export default function HistorySidebar({
                               }}
                               className={`w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors ${
                                 isActiveVersion
-                                  ? 'bg-blue-100 text-blue-700 font-semibold'
+                                  ? 'bg-blue-50 text-blue-700 font-semibold'
                                   : 'text-slate-600 hover:bg-slate-100'
                               }`}
                             >
                               <span className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold flex-shrink-0 ${
-                                isActiveVersion ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'
+                                isActiveVersion ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-600'
                               }`}>
                                 v{v.v}
                               </span>
@@ -299,7 +322,7 @@ export default function HistorySidebar({
 
       {/* Footer note */}
       <div className="p-3 border-t border-slate-100">
-        <p className="text-[10px] text-slate-400 leading-relaxed">
+        <p className="text-[11px] text-slate-400 leading-relaxed">
           本期历史仅在当前窗口保存，刷新页面会清空
         </p>
       </div>

@@ -62,7 +62,7 @@ type TypeTab = 'all' | IssueType;
 const TYPE_TABS: Array<{ value: TypeTab; label: string; icon: string }> = [
   { value: 'all',               label: '全部',   icon: '⊞' },
   { value: 'layout',            label: '布局',   icon: '◫' },
-  { value: 'style',             label: '样式',   icon: '◈' },
+  { value: 'style',             label: '视觉',   icon: '◈' },
   { value: 'content',           label: '内容',   icon: '◧' },
   { value: 'interaction',       label: '交互',   icon: '◉' },
   { value: 'platform-specific', label: '平台规范', icon: '⊕' },
@@ -118,13 +118,13 @@ export default function IssuesSidebar({
   return (
     <aside className="w-[360px] min-w-[360px] flex-shrink-0 flex flex-col material-thick border-l border-slate-200/60">
       {/* Header */}
-      <div className="flex flex-col gap-3 p-4 border-b border-slate-100">
+      <div className="flex flex-col gap-3 p-4 pb-3 border-b border-slate-100">
         <div className="flex items-center justify-between">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+          <h2 className="text-[15px] font-semibold text-slate-900">
             差异列表
           </h2>
+          {session && <SessionMeta session={session} scope={effectiveScope} />}
         </div>
-        {session && <SessionMeta session={session} />}
         {showScopeToggle && (
           <div className="flex items-center gap-1 rounded-md bg-slate-100 p-0.5 self-start">
             <button
@@ -227,58 +227,20 @@ export default function IssuesSidebar({
   );
 }
 
-function SessionMeta({ session }: { session: AuditSession }) {
+function SessionMeta({ session, scope }: { session: AuditSession; scope: 'active' | 'all' }) {
   const cur = getCurrentVersion(session);
   const ctx = getActiveContext(session);
-  const r = ctx?.crossPlatformResult ?? null;
-
-  if (!r) return (
-    <div className="flex items-center gap-2 pt-1">
-      <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-[10px] font-bold">
-        v{cur.v}
-      </span>
-      <p className="text-xs text-slate-400">尚未生成走查</p>
-    </div>
-  );
-
-  // 按状态计数（严重度维度已下线）
-  const counts = { pending: 0, fixed: 0, ignored: 0, deferred: 0 };
-  for (const issue of r.issues) {
-    const st = issue.status ?? 'pending';
-    counts[st] = (counts[st] ?? 0) + 1;
-  }
-  const total = r.issues.length;
+  const total = scope === 'all'
+    ? (cur.boards ?? []).reduce(
+        (count, board) => count + (board.crossPlatformResult?.issues.length ?? 0),
+        0,
+      )
+    : (ctx?.crossPlatformResult?.issues.length ?? 0);
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5 pt-1">
-      <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-[10px] font-bold">
-        v{cur.v}
-      </span>
-      <span className="text-xs text-slate-600">共 <span className="font-semibold tabular-nums">{total}</span> 项</span>
-      {counts.pending > 0 && (
-        <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
-          待修复 {counts.pending}
-        </span>
-      )}
-      {counts.fixed > 0 && (
-        <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
-          已修复 {counts.fixed}
-        </span>
-      )}
-      {counts.deferred > 0 && (
-        <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
-          暂不处理 {counts.deferred}
-        </span>
-      )}
-      {counts.ignored > 0 && (
-        <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">
-          已忽略 {counts.ignored}
-        </span>
-      )}
-      {r.isMock && (
-        <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-50 text-purple-600 font-medium">mock</span>
-      )}
-    </div>
+    <span className="text-[11px] text-slate-400 tabular-nums">
+      共 <span className="font-medium text-slate-500">{total}</span> 项
+    </span>
   );
 }
 
@@ -413,61 +375,60 @@ function CrossPlatformIssues({
   return (
     <div className="flex flex-col">
       {/* ── 类型 Tab 栏 ── */}
-      <div className="sticky top-0 z-10 bg-white border-b border-slate-100 px-3 pt-3 pb-0">
-        <div className="flex gap-0.5 overflow-x-auto scrollbar-none pb-px">
+      <div className="sticky top-0 z-10 bg-white border-b border-slate-100 px-4 pt-2">
+        <div className="flex gap-4 overflow-x-auto scrollbar-none">
           {TYPE_TABS.map(({ value, label }) => {
             const count = typeCounts[value];
-            // 没有该类型问题时隐藏（'all' 始终显示）
-            if (value !== 'all' && count === 0) return null;
+            // 常用四类固定展示；其余类型有数据时再出现，避免挤占横向空间。
+            const isCoreType = value === 'all' || value === 'layout' || value === 'style' || value === 'content';
+            if (!isCoreType && count === 0) return null;
             const active = typeTab === value;
             return (
               <button
                 key={value}
                 type="button"
                 onClick={() => setTypeTab(value)}
-                className={`flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold rounded-t-md border-b-2 transition-colors whitespace-nowrap ${
+                className={`flex-shrink-0 flex items-center gap-1 py-2 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
                   active
-                    ? 'border-blue-600 text-blue-700 bg-blue-50/60'
-                    : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                    ? 'border-blue-600 text-blue-700'
+                    : 'border-transparent text-slate-400 hover:text-slate-700'
                 }`}
               >
                 {label}
-                <span
-                  className={`inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold ${
-                    active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'
-                  }`}
-                >
-                  {count}
-                </span>
+                {count > 0 && (
+                  <span className={`text-[11px] tabular-nums ${active ? 'text-blue-600' : 'text-slate-400'}`}>
+                    {count}
+                  </span>
+                )}
               </button>
             );
           })}
         </div>
       </div>
 
-      <div className="p-3 flex flex-col gap-4">
+      <div className="p-4 flex flex-col gap-3">
         {highlightedRegionName && (
           <button
             onClick={() => onHighlightRegion?.(null)}
-            className="text-xs text-blue-600 px-3 py-1.5 rounded-lg bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-colors self-start"
+            className="text-[11px] text-slate-600 px-2.5 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 transition-colors self-start"
           >
-            正在高亮：{highlightedRegionName} ×
+            筛选：{highlightedRegionName} ×
           </button>
         )}
 
         {/* 一键自动匹配（v>=2 且当前 tab 下存在未关联问题时展示；跨画板视图禁用） */}
         {scope === 'active' && prev && onAutoLinkAll && hasUnlinkedInTab && (
-          <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100">
+          <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg bg-slate-50">
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-blue-700">💡 一键匹配上版</p>
-              <p className="text-[10px] text-slate-500 truncate">
+              <p className="text-xs font-medium text-slate-700">一键匹配上版</p>
+              <p className="text-[10px] text-slate-400 truncate mt-0.5">
                 基于标题/描述/区域相似度自动关联未匹配的问题
               </p>
             </div>
             <button
               type="button"
               onClick={onAutoLinkAll}
-              className="flex-shrink-0 px-2.5 py-1 rounded-md text-[11px] font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm"
+              className="flex-shrink-0 px-2.5 py-1.5 rounded-md text-[11px] font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
             >
               自动匹配
             </button>
@@ -527,7 +488,7 @@ function CrossPlatformIssues({
                   }}
                   className={`self-start inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${
                     boardIsActive
-                      ? 'bg-blue-100 text-blue-700'
+                      ? 'bg-blue-50 text-blue-700'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                   title={boardIsActive ? '当前画板' : '点击切换到该画板'}

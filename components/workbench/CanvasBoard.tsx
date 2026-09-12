@@ -316,8 +316,8 @@ export default forwardRef<CanvasBoardHandle, CanvasBoardProps>(function CanvasBo
       ref={wrapperRef}
       className={
         height === 'fill'
-          ? 'relative w-full flex-1 min-h-0 rounded-2xl border border-slate-200/60 bg-white overflow-hidden shadow-chip'
-          : 'relative w-full rounded-2xl border border-slate-200/60 bg-white overflow-hidden shadow-chip'
+          ? 'relative w-full flex-1 min-h-0 rounded-xl border border-slate-200/50 bg-slate-50/50 overflow-hidden'
+          : 'relative w-full rounded-xl border border-slate-200/50 bg-slate-50/50 overflow-hidden'
       }
       style={
         height === 'fill'
@@ -332,10 +332,10 @@ export default forwardRef<CanvasBoardHandle, CanvasBoardProps>(function CanvasBo
         style={{
           scrollbarGutter: 'stable',
           backgroundImage: `
-            linear-gradient(rgba(148,163,184,0.10) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(148,163,184,0.10) 1px, transparent 1px),
-            linear-gradient(rgba(148,163,184,0.22) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(148,163,184,0.22) 1px, transparent 1px)
+            linear-gradient(rgba(148,163,184,0.06) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(148,163,184,0.06) 1px, transparent 1px),
+            linear-gradient(rgba(148,163,184,0.14) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(148,163,184,0.14) 1px, transparent 1px)
           `,
           backgroundSize: '20px 20px, 20px 20px, 100px 100px, 100px 100px',
           backgroundPosition: `${RULER}px ${RULER}px`,
@@ -487,10 +487,10 @@ export default forwardRef<CanvasBoardHandle, CanvasBoardProps>(function CanvasBo
         </button>
       </div>
 
-      {/* 鼠标坐标浮标 —— 深色 chip，也走轻材质（backdrop blur 让下方图能透一点） */}
+      {/* 鼠标坐标浮标：浅色辅助信息，避免抢过截图与差异内容 */}
       {cursor && (
         <div
-          className="pointer-events-none absolute z-30 rounded-md bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-mono px-2 py-1 shadow-float"
+          className="pointer-events-none absolute z-30 rounded-md border border-slate-200/80 bg-slate-100/90 text-slate-500 text-[10px] font-mono px-2 py-1 shadow-chip"
           style={{
             bottom: CONTROLS_PAD + 44,
             right: CONTROLS_PAD,
