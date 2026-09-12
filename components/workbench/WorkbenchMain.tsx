@@ -320,7 +320,7 @@ export default function WorkbenchMain({
           <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-500">
             跨端走查
           </span>
-          <h1 className="text-base font-semibold text-slate-900 truncate">{session.name}</h1>
+          <h1 className="text-[15px] font-semibold text-slate-800 truncate">{session.name}</h1>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <span className="text-[11px] text-slate-400 tabular-nums">
@@ -800,10 +800,10 @@ function WorkbenchToolBar({
 
   // 统一按钮样式 helper
   const tbBtn = (active: boolean) =>
-    `flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
+    `flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors ${
       active
-        ? 'bg-blue-50 text-blue-700'
-        : 'text-slate-600 hover:bg-slate-100'
+        ? 'bg-blue-50 text-blue-700 font-semibold'
+        : 'text-slate-500 font-medium hover:bg-slate-100 hover:text-slate-600'
     }`;
 
   return (
@@ -876,12 +876,12 @@ function WorkbenchToolBar({
             type="button"
             disabled={isManualActive || disabled}
             onClick={() => !isManualActive && !disabled && onViewModeChange(id)}
-            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors ${
               isManualActive || disabled
-                ? 'text-slate-300 cursor-not-allowed'
+                ? 'text-slate-300 font-medium cursor-not-allowed'
                 : viewMode === id
-                  ? 'bg-blue-50 text-blue-700'
-                  : 'text-slate-600 hover:bg-slate-100'
+                  ? 'bg-blue-50 text-blue-700 font-semibold'
+                  : 'text-slate-500 font-medium hover:bg-slate-100 hover:text-slate-600'
             }`}
           >
             {icon}{label}
@@ -900,8 +900,10 @@ function WorkbenchToolBar({
               key={p}
               type="button"
               onClick={() => onSliderTargetChange(p)}
-              className={`px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
-                sliderTarget === p ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'
+              className={`px-2 py-1 rounded-md text-xs transition-colors ${
+                sliderTarget === p
+                  ? 'bg-blue-50 text-blue-700 font-semibold'
+                  : 'text-slate-500 font-medium hover:bg-slate-100 hover:text-slate-600'
               }`}
             >
               {p === 'ios' ? 'iOS' : 'Android'}
@@ -967,12 +969,12 @@ function WorkbenchToolBar({
         type="button"
         onClick={onStartManual}
         disabled={isManualActive}
-        className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
+        className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors ${
           manualMode === 'drawing'
-            ? 'bg-blue-50 text-blue-700'
+            ? 'bg-blue-50 text-blue-700 font-semibold'
             : manualMode === 'editing'
-              ? 'bg-blue-50 text-blue-700'
-              : 'text-slate-600 hover:bg-slate-100'
+              ? 'bg-blue-50 text-blue-700 font-semibold'
+              : 'text-slate-500 font-medium hover:bg-slate-100 hover:text-slate-600'
         } disabled:opacity-50 disabled:cursor-not-allowed`}
       >
         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -993,12 +995,12 @@ function WorkbenchToolBar({
         onClick={onRunAudit}
         disabled={!canRun || auditing || disabledByOther}
         title={disabledByOther ? '批量执行进行中，请等待完成' : runBtnTitle}
-        className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors ${
+        className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs transition-colors ${
           !canRun || auditing || disabledByOther
-            ? 'text-slate-300 cursor-not-allowed'
+            ? 'text-slate-300 font-medium cursor-not-allowed'
             : hasResult
-              ? 'text-slate-600 hover:bg-slate-100'
-              : 'bg-blue-600 text-white hover:bg-blue-700'
+              ? 'text-slate-500 font-medium hover:bg-slate-100 hover:text-slate-600'
+              : 'bg-blue-600 text-white font-semibold hover:bg-blue-700'
         }`}
       >
         {auditing ? (
@@ -1048,9 +1050,9 @@ function VersionSwitcher({
         ref={triggerRef}
         type="button"
         onClick={handleToggle}
-        className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
+        className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-600 transition-colors"
       >
-        <span className="inline-flex items-center justify-center w-4 h-4 rounded bg-blue-100 text-blue-700 text-[9px] font-bold">
+        <span className="inline-flex items-center justify-center w-4 h-4 rounded bg-blue-100 text-blue-700 text-[9px] font-semibold">
           v{cur.v}
         </span>
         <span>{session.versions.length > 1 ? '当前版本' : '仅一版'}</span>
@@ -1066,7 +1068,7 @@ function VersionSwitcher({
         type="button"
         onClick={onAddVersion}
         disabled={!canAdd}
-        className="flex items-center gap-0.5 px-1.5 py-1 rounded-md text-[11px] font-medium text-slate-600 hover:bg-slate-100 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors"
+        className="flex items-center gap-0.5 px-1.5 py-1 rounded-md text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-600 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors"
       >
         <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
@@ -1081,7 +1083,7 @@ function VersionSwitcher({
         type="button"
         onClick={onOpenDiff}
         disabled={!canDiff}
-        className="flex items-center gap-0.5 px-1.5 py-1 rounded-md text-[11px] font-medium text-slate-600 hover:bg-slate-100 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors"
+        className="flex items-center gap-0.5 px-1.5 py-1 rounded-md text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-600 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors"
       >
         <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}

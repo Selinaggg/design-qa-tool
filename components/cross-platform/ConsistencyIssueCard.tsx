@@ -136,7 +136,7 @@ const ConsistencyIssueCard = forwardRef<HTMLDivElement, ConsistencyIssueCardProp
         </div>
 
         {/* Row 2: title */}
-        <p className="text-[15px] font-semibold text-slate-900 leading-snug break-words w-full">
+        <p className="text-[15px] font-semibold text-slate-800 leading-snug break-words w-full">
           {issue.title}
           {issue.isAcceptablePlatformDifference && (
             <span className="ml-2 text-xs font-normal text-slate-400">（平台合理差异）</span>
@@ -409,7 +409,7 @@ function DetailBlock({ label, text, highlight }: { label: string; text: string; 
       <p className={`text-[11px] font-medium mb-1.5 ${highlight ? 'text-blue-700' : 'text-slate-500'}`}>
         {label}
       </p>
-      <p className="text-[13px] text-slate-700 leading-relaxed break-words whitespace-pre-wrap">
+      <p className="text-[13px] font-normal text-slate-600 leading-relaxed break-words whitespace-pre-wrap">
         {text}
       </p>
     </div>
