@@ -16,8 +16,10 @@ import { useInverseScale } from '@/components/workbench/CanvasScaleContext';
 interface CoordinateOverlayProps {
   imageNaturalWidth: number;
   imageNaturalHeight: number;
-  /** 十字线 + chip 底色 */
+  /** 十字线颜色 */
   accentColor?: string;
+  /** chip 底色 */
+  accentBackgroundColor?: string;
   /** chip 文字色 */
   accentTextColor?: string;
 }
@@ -26,7 +28,8 @@ export default function CoordinateOverlay({
   imageNaturalWidth,
   imageNaturalHeight,
   accentColor = '#2563eb',
-  accentTextColor = '#ffffff',
+  accentBackgroundColor,
+  accentTextColor = '#1d4ed8',
 }: CoordinateOverlayProps) {
   const layerRef = useRef<HTMLDivElement>(null);
   const inv = useInverseScale(); // 画板整体缩放的倒数：画板 25% → inv = 4
@@ -94,7 +97,7 @@ export default function CoordinateOverlay({
               width: lineThickness,
               marginLeft: -lineThickness / 2,
               background: accentColor,
-              opacity: 0.55,
+              opacity: 0.4,
             }}
           />
           {/* 横线 */}
@@ -107,7 +110,7 @@ export default function CoordinateOverlay({
               height: lineThickness,
               marginTop: -lineThickness / 2,
               background: accentColor,
-              opacity: 0.55,
+              opacity: 0.4,
             }}
           />
           {/* 坐标 chip：贴光标右下；反补偿字号，画板缩放下依然清晰 */}
@@ -120,14 +123,15 @@ export default function CoordinateOverlay({
               transformOrigin: '0 0',
               padding: `${chipPadY}px ${chipPadX}px`,
               borderRadius: chipRadius,
-              background: accentColor,
+              background: accentBackgroundColor ?? accentColor,
               color: accentTextColor,
               fontSize: chipFontSize,
               lineHeight: 1.2,
               fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
               fontWeight: 600,
               whiteSpace: 'nowrap',
-              boxShadow: `0 ${2 * inv}px ${8 * inv}px rgba(15,23,42,0.25)`,
+              border: `${1 * inv}px solid ${accentColor}55`,
+              boxShadow: `0 ${1 * inv}px ${4 * inv}px rgba(15,23,42,0.10)`,
               maxWidth: chipMaxW,
               fontVariantNumeric: 'tabular-nums',
             }}

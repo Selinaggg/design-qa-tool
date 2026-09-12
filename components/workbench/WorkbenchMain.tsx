@@ -313,17 +313,17 @@ export default function WorkbenchMain({
     (!hasIos && hasAndroid && hasDesign && !!session.androidDevice);
 
   return (
-    <main className="flex-1 min-w-0 flex flex-col bg-slate-50 overflow-hidden">
+    <main className="flex-1 min-w-0 flex flex-col bg-slate-50/80 overflow-hidden">
       {/* Session header —— 半透明 chrome，内容从下方穿过（Apple §12） */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-slate-200/60 material-thick flex-shrink-0">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200/60 material-thick flex-shrink-0">
         <div className="flex items-center gap-3 min-w-0">
-          <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-purple-100 text-purple-700">
+          <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-500">
             跨端走查
           </span>
-          <h1 className="text-sm font-semibold text-slate-800 truncate">{session.name}</h1>
+          <h1 className="text-base font-semibold text-slate-900 truncate">{session.name}</h1>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          <span className="text-xs text-slate-400">
+          <span className="text-[11px] text-slate-400 tabular-nums">
             {new Date(session.createdAt).toLocaleString()}
           </span>
         </div>
@@ -370,7 +370,7 @@ export default function WorkbenchMain({
       )}
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-5">
         <CrossPlatformWorkbench
           session={session}
           onAddVersion={onAddVersion}
@@ -535,7 +535,7 @@ function CrossPlatformWorkbench({
   const isSinglePlatform = onlyIos || onlyAndroid;
 
   return (
-    <div className="max-w-6xl mx-auto flex flex-col gap-5">
+    <div className="max-w-6xl mx-auto flex flex-col gap-4">
       {/* Comparison —— Figma 风格画板；高度锁定为视口高度减去顶部工具条，确保两图完整可见 */}
       <div style={{ height: 'calc(100vh - 200px)', minHeight: 420 }} className="flex">
         <CanvasBoard
@@ -637,6 +637,7 @@ function CrossPlatformWorkbench({
       {/* Annotation —— 已标注区域纯列表（标注模式下更突出） */}
       <Card
         title="标注关注区域"
+        meta={`已标注 ${iosRegions.length + androidRegions.length} 个区域`}
         subtitle={
           effectiveViewMode === 'annotate'
             ? '在图上拖动框选区域，可输入名称；相同名称自动配对参与走查'
@@ -693,22 +694,32 @@ function rectToLocation(rect: NormalizedRect): IssueLocation {
 function Card({
   children,
   title,
+  meta,
   subtitle,
 }: {
   children: React.ReactNode;
   title?: string;
+  meta?: string;
   subtitle?: string;
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+    <section className="border-t border-slate-200/80 pt-4 pb-2">
       {title && (
-        <div className="mb-4">
-          <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
-          {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
+        <div className="mb-4 flex items-start gap-2">
+          <svg className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+          </svg>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-baseline justify-between gap-4">
+              <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
+              {meta && <span className="text-[11px] text-slate-400 tabular-nums">{meta}</span>}
+            </div>
+            {subtitle && <p className="text-[11px] text-slate-400 mt-1">{subtitle}</p>}
+          </div>
         </div>
       )}
       {children}
-    </div>
+    </section>
   );
 }
 function MissingAssets({ text }: { text: string }) {
@@ -722,6 +733,10 @@ function MissingAssets({ text }: { text: string }) {
 // ─── VersionSwitcher：版本切换 + 新建按钮 ─────────────────────────────────
 
 // ─── WorkbenchToolBar：工具条（替换 InsightsBar） ─────────────────────────
+
+function TBDivider() {
+  return <div className="w-px h-3 bg-slate-200 flex-shrink-0 mx-0.5" />;
+}
 
 function WorkbenchToolBar({
   session,
@@ -783,16 +798,11 @@ function WorkbenchToolBar({
     ? '仅重跑当前画板；如需批量执行请点顶部「批量执行走查」按钮'
     : undefined;
 
-  // 分隔线
-  const TBDivider = () => <div className="w-px h-3 bg-slate-200 flex-shrink-0 mx-0.5" />;
-
   // 统一按钮样式 helper
-  const tbBtn = (active: boolean, danger = false) =>
+  const tbBtn = (active: boolean) =>
     `flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
       active
-        ? danger
-          ? 'bg-amber-500 text-white'
-          : 'bg-blue-600 text-white'
+        ? 'bg-blue-50 text-blue-700'
         : 'text-slate-600 hover:bg-slate-100'
     }`;
 
@@ -870,7 +880,7 @@ function WorkbenchToolBar({
               isManualActive || disabled
                 ? 'text-slate-300 cursor-not-allowed'
                 : viewMode === id
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-blue-50 text-blue-700'
                   : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
@@ -891,7 +901,7 @@ function WorkbenchToolBar({
               type="button"
               onClick={() => onSliderTargetChange(p)}
               className={`px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
-                sliderTarget === p ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'
+                sliderTarget === p ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'
               }`}
             >
               {p === 'ios' ? 'iOS' : 'Android'}
@@ -923,7 +933,7 @@ function WorkbenchToolBar({
           <button
             type="button"
             onClick={() => onClearScreenChange(!clearScreen)}
-            className={tbBtn(clearScreen, true)}
+            className={tbBtn(clearScreen)}
           >
             <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor"
               strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -942,7 +952,7 @@ function WorkbenchToolBar({
             </svg>
             清屏
             <kbd className={`text-[9px] font-mono px-1 py-0.5 rounded ${
-              clearScreen ? 'bg-amber-400/50' : 'bg-slate-100 text-slate-400'
+              clearScreen ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-400'
             }`}>Z</kbd>
           </button>
           </TBTooltip>
@@ -959,9 +969,9 @@ function WorkbenchToolBar({
         disabled={isManualActive}
         className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
           manualMode === 'drawing'
-            ? 'bg-purple-600 text-white'
+            ? 'bg-blue-50 text-blue-700'
             : manualMode === 'editing'
-              ? 'bg-purple-100 text-purple-700'
+              ? 'bg-blue-50 text-blue-700'
               : 'text-slate-600 hover:bg-slate-100'
         } disabled:opacity-50 disabled:cursor-not-allowed`}
       >
@@ -1107,7 +1117,7 @@ function VersionSwitcher({
                       }`}
                     >
                       <span className={`inline-flex items-center justify-center w-6 h-6 rounded text-[10px] font-bold ${
-                        isCurrent ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'
+                        isCurrent ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500'
                       }`}>
                         v{v.v}
                       </span>
