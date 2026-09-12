@@ -172,10 +172,10 @@ export function ExportDropdown({ session, disabled }: { session: AuditSession; d
         type="button"
         disabled={disabled || pdfLoading}
         onClick={handleToggle}
-        className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
+        className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
           disabled || pdfLoading
             ? 'text-slate-300 cursor-not-allowed'
-            : 'text-slate-600 hover:bg-slate-100 cursor-pointer'
+            : 'text-slate-500 hover:bg-slate-100 hover:text-slate-600 cursor-pointer'
         }`}
         title={disabled ? '请先执行走查' : '导出报告'}
       >

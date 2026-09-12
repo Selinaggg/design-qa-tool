@@ -166,7 +166,7 @@ export default function HistorySidebar({
       {/* Header + New button */}
       <div className="flex flex-col gap-3 p-4 border-b border-slate-100">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-slate-800">
+          <h2 className="text-[13px] font-semibold text-slate-400">
             走查历史
           </h2>
           <button
@@ -265,14 +265,14 @@ export default function HistorySidebar({
                       </div>
                     </div>
                     <div className="flex items-baseline gap-1.5 min-w-0">
-                      <span className="text-[13px] font-semibold text-slate-800 truncate">
+                      <span className="text-[13px] font-semibold text-slate-700 truncate">
                         {s.name}
                       </span>
-                      <span className="text-[10px] text-slate-400 tabular-nums flex-shrink-0">
+                      <span className="text-[11px] font-normal text-slate-400 tabular-nums flex-shrink-0">
                         {formatClock(s.createdAt)}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-400 tabular-nums">
+                    <p className="text-[11px] font-normal text-slate-400 tabular-nums">
                       {s.versions.length} 个版本 · {issueCount} 个差异
                     </p>
                   </div>

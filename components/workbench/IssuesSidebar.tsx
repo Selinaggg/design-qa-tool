@@ -120,7 +120,7 @@ export default function IssuesSidebar({
       {/* Header */}
       <div className="flex flex-col gap-3 p-4 pb-3 border-b border-slate-100">
         <div className="flex items-center justify-between">
-          <h2 className="text-[15px] font-semibold text-slate-900">
+          <h2 className="text-[13px] font-semibold text-slate-400">
             差异列表
           </h2>
           {session && <SessionMeta session={session} scope={effectiveScope} />}
@@ -388,10 +388,10 @@ function CrossPlatformIssues({
                 key={value}
                 type="button"
                 onClick={() => setTypeTab(value)}
-                className={`flex-shrink-0 flex items-center gap-1 py-2 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
+                className={`flex-shrink-0 flex items-center gap-1 py-2 text-[13px] border-b-2 transition-colors whitespace-nowrap ${
                   active
-                    ? 'border-blue-600 text-blue-700'
-                    : 'border-transparent text-slate-400 hover:text-slate-700'
+                    ? 'border-blue-600 text-blue-700 font-semibold'
+                    : 'border-transparent text-slate-400 font-medium hover:text-slate-600'
                 }`}
               >
                 {label}
